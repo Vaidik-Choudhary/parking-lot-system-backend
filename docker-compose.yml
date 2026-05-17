@@ -48,7 +48,7 @@ services:
     ports:
       - "8080:8080"
     environment:
-      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://discovery-service:8761/eureka/
+      EUREKA_CLIENT_SERVICE_URL_DEFAULT_ZONE: http://discovery-service:8761/eureka/
     depends_on:
       - discovery-service
     networks:
@@ -60,7 +60,7 @@ services:
     ports:
       - "8081:8081"
     environment:
-      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://discovery-service:8761/eureka/
+      EUREKA_CLIENT_SERVICE_URL_DEFAULT_ZONE: http://discovery-service:8761/eureka/
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/parkease_auth?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
       DB_PASSWORD: ${DB_PASSWORD:-root}
       JWT_SECRET: ${JWT_SECRET:-parkease_super_secret_key_that_is_long_enough_for_jwt_256_bits}
@@ -81,7 +81,7 @@ services:
     ports:
       - "8082:8082"
     environment:
-      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://discovery-service:8761/eureka/
+      EUREKA_CLIENT_SERVICE_URL_DEFAULT_ZONE: http://discovery-service:8761/eureka/
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/parkease_parkinglot?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
       DB_PASSWORD: ${DB_PASSWORD:-root}
       JWT_SECRET: ${JWT_SECRET:-parkease_super_secret_key_that_is_long_enough_for_jwt_256_bits}
@@ -99,7 +99,7 @@ services:
     ports:
       - "8083:8083"
     environment:
-      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://discovery-service:8761/eureka/
+      EUREKA_CLIENT_SERVICE_URL_DEFAULT_ZONE: http://discovery-service:8761/eureka/
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/parkease_spot?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
       DB_PASSWORD: ${DB_PASSWORD:-root}
       JWT_SECRET: ${JWT_SECRET:-parkease_super_secret_key_that_is_long_enough_for_jwt_256_bits}
@@ -117,7 +117,7 @@ services:
     ports:
       - "8084:8084"
     environment:
-      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://discovery-service:8761/eureka/
+      EUREKA_CLIENT_SERVICE_URL_DEFAULT_ZONE: http://discovery-service:8761/eureka/
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/parkease_vehicle?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
       DB_PASSWORD: ${DB_PASSWORD:-root}
       JWT_SECRET: ${JWT_SECRET:-parkease_super_secret_key_that_is_long_enough_for_jwt_256_bits}
@@ -135,7 +135,7 @@ services:
     ports:
       - "8085:8085"
     environment:
-      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://discovery-service:8761/eureka/
+      EUREKA_CLIENT_SERVICE_URL_DEFAULT_ZONE: http://discovery-service:8761/eureka/
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/parkease_booking?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
       DB_PASSWORD: ${DB_PASSWORD:-root}
       JWT_SECRET: ${JWT_SECRET:-parkease_super_secret_key_that_is_long_enough_for_jwt_256_bits}
@@ -157,7 +157,7 @@ services:
     ports:
       - "8086:8086"
     environment:
-      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://discovery-service:8761/eureka/
+      EUREKA_CLIENT_SERVICE_URL_DEFAULT_ZONE: http://discovery-service:8761/eureka/
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/parkease_payment?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
       DB_PASSWORD: ${DB_PASSWORD:-root}
       JWT_SECRET: ${JWT_SECRET:-parkease_super_secret_key_that_is_long_enough_for_jwt_256_bits}
@@ -181,7 +181,7 @@ services:
     ports:
       - "8087:8087"
     environment:
-      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://discovery-service:8761/eureka/
+      EUREKA_CLIENT_SERVICE_URL_DEFAULT_ZONE: http://discovery-service:8761/eureka/
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/parkease_notification?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
       DB_PASSWORD: ${DB_PASSWORD:-root}
       JWT_SECRET: ${JWT_SECRET:-parkease_super_secret_key_that_is_long_enough_for_jwt_256_bits}
@@ -204,7 +204,7 @@ services:
     ports:
       - "8088:8088"
     environment:
-      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://discovery-service:8761/eureka/
+      EUREKA_CLIENT_SERVICE_URL_DEFAULT_ZONE: http://discovery-service:8761/eureka/
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/parkease_analytics?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
       DB_PASSWORD: ${DB_PASSWORD:-root}
       JWT_SECRET: ${JWT_SECRET:-parkease_super_secret_key_that_is_long_enough_for_jwt_256_bits}
@@ -222,7 +222,7 @@ services:
     ports:
       - "9091:9090"
     environment:
-      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://discovery-service:8761/eureka/
+      EUREKA_CLIENT_SERVICE_URL_DEFAULT_ZONE: http://discovery-service:8761/eureka/
     depends_on:
       discovery-service:
         condition: service_started
