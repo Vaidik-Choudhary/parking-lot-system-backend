@@ -2,14 +2,14 @@ package com.parkease.payment.util;
 
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
-import lombok.extern.slf4j.Slf4j;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import java.security.Key;
 
 @Component 
-@Slf4j
 public class JwtUtil {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(JwtUtil.class);
     @Value("${app.jwt.secret}") private String secret;
     private Key key() { return Keys.hmacShaKeyFor(secret.getBytes()); }
 

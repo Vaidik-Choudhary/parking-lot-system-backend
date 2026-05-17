@@ -1,6 +1,8 @@
 package com.parkease.auth.exception;
 
 import com.parkease.auth.dto.response.ApiResponse;
+
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.*;
 import org.springframework.validation.FieldError;
@@ -54,8 +56,16 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(Exception.class)
-    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)  
-    public ApiResponse handleGeneral(Exception ex) {
+    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+    public ApiResponse handleGeneral(HttpServletRequest request, Exception ex) throws Exception {
+
+        String path = request.getRequestURI();
+
+        // âœ… Skip OAuth endpoints
+        if (path.startsWith("/oauth2") || path.startsWith("/login/oauth2")) {
+            throw ex; // let Spring Security handle it
+        }
+
         log.error("Unexpected error: {}", ex.getMessage(), ex);
         return ApiResponse.fail("Something went wrong. Please try again later.");
     }

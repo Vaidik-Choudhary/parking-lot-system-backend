@@ -13,6 +13,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import com.parkease.parkinglot.annotation.TrackExecutionTime;
 
 @RestController
 @RequestMapping("/api/lots")
@@ -27,6 +28,7 @@ public class ParkingLotController {
      * Returns all open + approved lots.
      * Guests and drivers can browse without logging in.
      */
+    @TrackExecutionTime
     @GetMapping
     public ResponseEntity<List<ParkingLotResponseDTO>> getAllOpenLots() {
         log.info("GET /api/lots");
@@ -37,6 +39,7 @@ public class ParkingLotController {
      * GET /api/lots/{id}
      * Get a single lot by its ID.
      */
+    @TrackExecutionTime
     @GetMapping("/{id}")
     public ResponseEntity<ParkingLotResponseDTO> getLotById(@PathVariable Long id) {
         log.info("GET /api/lots/{}", id);
@@ -49,16 +52,22 @@ public class ParkingLotController {
      * Example: GET /api/lots/city/Mumbai
      */
     @GetMapping("/city/{city}")
-    public ResponseEntity<List<ParkingLotResponseDTO>> getLotsByCity(@PathVariable String city) {
-        log.info("GET /api/lots/city/{}", city);
-        return ResponseEntity.ok(service.getByCity(city));
+    public ResponseEntity<List<ParkingLotResponseDTO>> getLotsByCity(
+            @PathVariable String city,
+            @RequestParam(required = false) Boolean hasEV,
+            @RequestParam(required = false) Boolean has2W,
+            @RequestParam(required = false) Boolean has4W,
+            @RequestParam(required = false) Boolean hasHeavy,
+            @RequestParam(required = false) Boolean hasHandicap) {
+        log.info("GET /api/lots/city/{} with filters", city);
+        return ResponseEntity.ok(service.getByCity(city, hasEV, has2W, has4W, hasHeavy, hasHandicap));
     }
 
     /**
      * GET /api/lots/nearby?lat=18.9&lon=72.8&radius=5
      * Find all approved+open lots within a given radius (km) of coordinates.
      *
-     * Uses the Haversine formula — results include distanceKm field, sorted nearest first.
+     * Uses the Haversine formula â€” results include distanceKm field, sorted nearest first.
      *
      * Params:
      *   lat    = user's latitude
@@ -69,23 +78,35 @@ public class ParkingLotController {
     public ResponseEntity<List<ParkingLotResponseDTO>> getNearbyLots(
             @RequestParam double lat,
             @RequestParam double lon,
-            @RequestParam(defaultValue = "5.0") double radius) {
-        log.info("GET /api/lots/nearby - lat={}, lon={}, radius={}km", lat, lon, radius);
-        return ResponseEntity.ok(service.getNearbyLots(lat, lon, radius));
+            @RequestParam(defaultValue = "5.0") double radius,
+            @RequestParam(required = false) Boolean hasEV,
+            @RequestParam(required = false) Boolean has2W,
+            @RequestParam(required = false) Boolean has4W,
+            @RequestParam(required = false) Boolean hasHeavy,
+            @RequestParam(required = false) Boolean hasHandicap) {
+        log.info("GET /api/lots/nearby - lat={}, lon={}, radius={}km with filters", lat, lon, radius);
+        
+        com.parkease.parkinglot.dto.request.NearbySearchRequest searchReq = com.parkease.parkinglot.dto.request.NearbySearchRequest.builder()
+                .lat(lat).lon(lon).radiusKm(radius)
+                .hasEV(hasEV).has2W(has2W).has4W(has4W).hasHeavy(hasHeavy).hasHandicap(hasHandicap)
+                .build();
+                
+        return ResponseEntity.ok(service.getNearbyLots(searchReq));
     }
 
     /**
      * POST /api/lots
-     * Create a new parking lot. Starts as unapproved — admin must approve it.
+     * Create a new parking lot. Starts as unapproved â€” admin must approve it.
      * The manager's email is extracted from the JWT automatically.
      */
+    @TrackExecutionTime
     @PostMapping
     @PreAuthorize("hasRole('LOT_MANAGER')")
     public ResponseEntity<ParkingLotResponseDTO> createLot(
             @Valid @RequestBody ParkingLotRequestDTO dto,
             Authentication auth) {
 
-        // FIX: principal is email String from JWT — NOT Long (your original bug)
+        // FIX: principal is email String from JWT â€” NOT Long (your original bug)
         String managerEmail = (String) auth.getPrincipal();
         log.info("POST /api/lots - manager: {}", managerEmail);
         return ResponseEntity.status(HttpStatus.CREATED)
@@ -164,7 +185,7 @@ public class ParkingLotController {
 
     /**
      * PUT /api/lots/admin/{id}/approve
-     * Approve a lot — it becomes publicly searchable after this.
+     * Approve a lot â€” it becomes publicly searchable after this.
      */
     @PutMapping("/admin/{id}/approve")
     @PreAuthorize("hasRole('ADMIN')")

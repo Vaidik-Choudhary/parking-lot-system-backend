@@ -1,20 +1,29 @@
 package com.parkease.parkinglot.dto.request;
 
+import com.parkease.parkinglot.dto.BaseParkingLotDTO;
 import jakarta.validation.constraints.*;
 import lombok.Data;
-import java.time.LocalTime;
+import lombok.EqualsAndHashCode;
+import lombok.NoArgsConstructor;
+import lombok.experimental.SuperBuilder;
 
 @Data
-public class ParkingLotRequestDTO {
+@SuperBuilder
+@NoArgsConstructor
+@EqualsAndHashCode(callSuper = true)
+public class ParkingLotRequestDTO extends BaseParkingLotDTO {
 
     @NotBlank(message = "Lot name is required")
-    private String name;
+    @Override
+    public String getName() { return super.getName(); }
 
     @NotBlank(message = "Address is required")
-    private String address;
+    @Override
+    public String getAddress() { return super.getAddress(); }
 
     @NotBlank(message = "City is required")
-    private String city;
+    @Override
+    public String getCity() { return super.getCity(); }
 
     @NotNull(message = "Latitude is required")
     @DecimalMin(value = "-90.0",  message = "Latitude must be >= -90")
@@ -27,10 +36,6 @@ public class ParkingLotRequestDTO {
     private Double longitude;
 
     @Min(value = 1, message = "Total spots must be at least 1")
-    private int totalSpots;
-
-    private LocalTime openTime;
-    private LocalTime closeTime;
-
-    private String imageUrl;
+    @Override
+    public int getTotalSpots() { return super.getTotalSpots(); }
 }

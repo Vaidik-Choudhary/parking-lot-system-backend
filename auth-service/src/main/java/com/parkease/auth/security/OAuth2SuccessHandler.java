@@ -60,9 +60,14 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
         String accessToken  = jwtUtil.generateToken(user.getEmail(), user.getRole().name());
         String refreshToken = refreshTokenService.createRefreshToken(user).getToken();
 
+     // Inside onAuthenticationSuccess in OAuth2SuccessHandler.java
         String redirectUrl = UriComponentsBuilder.fromUriString(frontendUrl + "/oauth2/success")
                 .queryParam("token", accessToken)
                 .queryParam("refreshToken", refreshToken)
+                .queryParam("role", user.getRole().name())
+                .queryParam("email", user.getEmail())
+                .queryParam("fullName", user.getFullName()) // Matches your localStorage key
+                .queryParam("userId", user.getId())
                 .build().toUriString();
 
         getRedirectStrategy().sendRedirect(request, response, redirectUrl);

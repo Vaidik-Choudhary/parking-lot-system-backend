@@ -107,14 +107,14 @@ public class AnalyticsController {
 
     /**
      * GET /api/analytics/lots/{lotId}/summary
-     * All metrics in one call — for the manager dashboard home page.
+     * All metrics in one call â€” for the manager dashboard home page.
      */
     @GetMapping("/lots/{lotId}/summary")
     @PreAuthorize("hasAnyRole('LOT_MANAGER', 'ADMIN')")
-    public ResponseEntity<LotSummaryDTO> getLotSummary( @PathVariable Long lotId, HttpServletRequest request) {        // ← add this
+    public ResponseEntity<LotSummaryDTO> getLotSummary( @PathVariable Long lotId, HttpServletRequest request) {        // â† add this
         log.info("GET /api/analytics/lots/{}/summary", lotId);
-        String token = request.getHeader("Authorization"); // ← extract token
-        return ResponseEntity.ok(service.getLotSummary(lotId, token)); // ← pass token
+        String token = request.getHeader("Authorization"); // â† extract token
+        return ResponseEntity.ok(service.getLotSummary(lotId, token)); // â† pass token
     }
 
     /**
@@ -123,7 +123,7 @@ public class AnalyticsController {
      */
     @GetMapping("/platform")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<PlatformSummaryDTO> getPlatformSummary(@PathVariable HttpServletRequest request) {
+    public ResponseEntity<PlatformSummaryDTO> getPlatformSummary(HttpServletRequest request) {
         log.info("GET /api/analytics/platform");
         String token = request.getHeader("Authorization");
         return ResponseEntity.ok(service.getPlatformSummary(token));

@@ -1,9 +1,8 @@
 package com.parkease.parkingspot.entity;
 
 public enum SpotType {
-    COMPACT,     
-    STANDARD,     
-    LARGE,       
-    MOTORBIKE,
-    EV            
+    STANDARD,     // 4 Wheeler
+    MOTORBIKE,    // 2 Wheeler
+    LARGE,        // Heavy Vehicle
+    EV            // Electric Vehicle only
 }

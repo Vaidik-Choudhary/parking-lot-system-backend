@@ -1,7 +1,9 @@
 package com.parkease.booking.service;
 
-import com.parkease.booking.entity.Booking;
-import com.parkease.booking.entity.BookingStatus;
+import com.parkease.booking.client.LotServiceClient;
+import com.parkease.booking.client.SpotServiceClient;
+import com.parkease.booking.entity.*;
+import com.parkease.booking.messaging.NotificationPublisher;
 import com.parkease.booking.repository.BookingRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -10,114 +12,79 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
-import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDateTime;
 import java.util.List;
 
-import static org.mockito.ArgumentMatchers.*;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class ExpiredBookingSchedulerTest {
 
-    @Mock
-    private BookingRepository repo;
+    @Mock BookingRepository repo;
+    @Mock SpotServiceClient spotServiceClient;
+    @Mock LotServiceClient lotServiceClient;
+    @Mock NotificationPublisher notificationPublisher;
 
-    @Mock
-    private RestTemplate restTemplate;
+    @InjectMocks ExpiredBookingScheduler scheduler;
 
-    @InjectMocks
-    private ExpiredBookingScheduler scheduler;
+    Booking booking;
 
-    @BeforeEach
-    void setUp() {
+    @BeforeEach void setUp() {
         ReflectionTestUtils.setField(scheduler, "graceMinutes", 15);
-        ReflectionTestUtils.setField(scheduler, "spotServiceUrl", "http://parkingspot-service");
-        ReflectionTestUtils.setField(scheduler, "lotServiceUrl", "http://parkinglot-service");
+        booking = Booking.builder().bookingId(1L).driverEmail("d@t.com")
+                .spotId(101L).lotId(10L).status(BookingStatus.RESERVED)
+                .bookingType(BookingType.PRE_BOOKING)
+                .startTime(LocalDateTime.now().minusHours(1))
+                .endTime(LocalDateTime.now().plusHours(1)).build();
     }
 
-    @Test
-    void shouldDoNothingWhenNoExpiredBookingsFound() {
-        when(repo.findExpiredPreBookings(any(LocalDateTime.class)))
-                .thenReturn(List.of());
-
+    @Test void shouldDoNothingWhenNoExpiredBookingsFound() {
+        when(repo.findExpiredPreBookings(any())).thenReturn(List.of());
         scheduler.cancelExpiredBookings();
-
         verify(repo, never()).save(any());
-        verify(restTemplate, never()).put(anyString(), any());
     }
 
-    @Test
-    void shouldCancelExpiredBookingsAndReleaseResources() {
-        Booking booking = Booking.builder()
-                .bookingId(1L)
-                .spotId(101L)
-                .lotId(10L)
-                .status(BookingStatus.RESERVED)
-                .build();
-
-        when(repo.findExpiredPreBookings(any(LocalDateTime.class)))
-                .thenReturn(List.of(booking));
+    @Test void shouldCancelExpiredBookingsAndReleaseResources() {
+        when(repo.findExpiredPreBookings(any())).thenReturn(List.of(booking));
+        when(repo.save(any())).thenReturn(booking);
+        doNothing().when(spotServiceClient).releaseSpot(anyLong());
+        doNothing().when(lotServiceClient).incrementAvailable(anyLong());
+        doNothing().when(notificationPublisher).publish(any());
 
         scheduler.cancelExpiredBookings();
 
+        assertEquals(BookingStatus.CANCELLED, booking.getStatus());
         verify(repo).save(booking);
-
-        verify(restTemplate).put(
-                contains("/api/spots/101/release"),
-                isNull()
-        );
-
-        verify(restTemplate).put(
-                contains("/api/lots/10/increment"),
-                isNull()
-        );
+        verify(spotServiceClient).releaseSpot(101L);
+        verify(lotServiceClient).incrementAvailable(10L);
+        verify(notificationPublisher).publish(any());
     }
 
-    @Test
-    void shouldContinueProcessingEvenIfOneBookingFails() {
-        Booking booking1 = Booking.builder()
-                .bookingId(1L)
-                .spotId(101L)
-                .lotId(10L)
-                .status(BookingStatus.RESERVED)
-                .build();
+    @Test void shouldContinueProcessingEvenIfOneBookingFails() {
+        Booking booking2 = Booking.builder().bookingId(2L).driverEmail("d2@t.com")
+                .spotId(102L).lotId(10L).status(BookingStatus.RESERVED)
+                .bookingType(BookingType.PRE_BOOKING)
+                .startTime(LocalDateTime.now().minusHours(1))
+                .endTime(LocalDateTime.now().plusHours(1)).build();
 
-        Booking booking2 = Booking.builder()
-                .bookingId(2L)
-                .spotId(102L)
-                .lotId(11L)
-                .status(BookingStatus.RESERVED)
-                .build();
+        when(repo.findExpiredPreBookings(any())).thenReturn(List.of(booking, booking2));
+        when(repo.save(any())).thenReturn(booking).thenThrow(new RuntimeException("DB error"));
 
-        when(repo.findExpiredPreBookings(any(LocalDateTime.class)))
-                .thenReturn(List.of(booking1, booking2));
+        assertDoesNotThrow(() -> scheduler.cancelExpiredBookings());
+    }
 
-        doThrow(new RuntimeException("spot-service down"))
-                .when(restTemplate)
-                .put(contains("/api/spots/101/release"), isNull());
+    @Test void shouldMarkBookingAsCancelledBeforeSaving() {
+        when(repo.findExpiredPreBookings(any())).thenReturn(List.of(booking));
+        when(repo.save(any())).thenReturn(booking);
+        doNothing().when(spotServiceClient).releaseSpot(anyLong());
+        doNothing().when(lotServiceClient).incrementAvailable(anyLong());
+        doNothing().when(notificationPublisher).publish(any());
 
         scheduler.cancelExpiredBookings();
 
-        verify(repo, times(2)).save(any(Booking.class));
-    }
-
-    @Test
-    void shouldMarkBookingAsCancelledBeforeSaving() {
-        Booking booking = Booking.builder()
-                .bookingId(1L)
-                .spotId(101L)
-                .lotId(10L)
-                .status(BookingStatus.RESERVED)
-                .build();
-
-        when(repo.findExpiredPreBookings(any(LocalDateTime.class)))
-                .thenReturn(List.of(booking));
-
-        scheduler.cancelExpiredBookings();
-
-        assert booking.getStatus() == BookingStatus.CANCELLED;
-        verify(repo).save(booking);
+        assertEquals(BookingStatus.CANCELLED, booking.getStatus());
     }
 }

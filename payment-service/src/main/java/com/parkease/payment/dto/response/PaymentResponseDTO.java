@@ -1,18 +1,19 @@
 package com.parkease.payment.dto.response;
 
+import lombok.*;
 import com.parkease.payment.entity.PaymentMode;
 import com.parkease.payment.entity.PaymentStatus;
-import lombok.*;
 import java.time.LocalDateTime;
 
-@Data 
-@Builder 
-@NoArgsConstructor 
+@Data
+@Builder
+@NoArgsConstructor
 @AllArgsConstructor
 public class PaymentResponseDTO {
 
     private Long paymentId;
     private Long bookingId;
+    private Long subscriptionId;
     private String driverEmail;
     private double amount;
     private String currency;

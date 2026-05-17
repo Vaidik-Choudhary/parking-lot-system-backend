@@ -10,11 +10,15 @@ import com.parkease.payment.entity.PaymentStatus;
 import com.parkease.payment.exception.PaymentException;
 import com.parkease.payment.exception.ResourceNotFoundException;
 import com.parkease.payment.mapper.PaymentMapper;
+import com.parkease.payment.messaging.NotificationEvent;
+import com.parkease.payment.messaging.NotificationPublisher;
 import com.parkease.payment.repository.PaymentRepository;
-import com.razorpay.*;
+import com.razorpay.RazorpayClient;
+import com.razorpay.RazorpayException;
+import com.razorpay.Order;
+import com.razorpay.Refund;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -28,13 +32,15 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
-@Slf4j
 public class PaymentServiceImpl implements PaymentService {
 
-    private final PaymentRepository   repo;
-    private final PaymentMapper       mapper;
-    private final RazorpayClient      razorpayClient;
-    private final ReceiptService      receiptService;
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(PaymentServiceImpl.class);
+
+    private final PaymentRepository    repo;
+    private final PaymentMapper        mapper;
+    private final RazorpayClient       razorpayClient;
+    private final ReceiptService       receiptService;
+    private final NotificationPublisher notificationPublisher;
 
     @Value("${razorpay.key.id}")
     private String razorpayKeyId;
@@ -42,7 +48,7 @@ public class PaymentServiceImpl implements PaymentService {
     @Value("${razorpay.key.secret}")
     private String razorpayKeySecret;
 
-    private Payment getOrThrow(Long id) {
+    private com.parkease.payment.entity.Payment getOrThrow(Long id) {
         return repo.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Payment not found with id: " + id));
     }
@@ -50,44 +56,65 @@ public class PaymentServiceImpl implements PaymentService {
     @Override
     @Transactional
     public OrderResponseDTO createOrder(CreateOrderRequest request, String driverEmail) {
-        log.info("Creating Razorpay order for booking: {} amount: ₹{}",
-                request.getBookingId(), request.getAmount());
+        Long bookingId = request.getBookingId();
+        Long subId = request.getSubscriptionId();
+        
+        log.info("Creating Razorpay order - Booking: {}, Subscription: {}, Amount: Rs.{}",
+                bookingId, subId, request.getAmount());
 
-        repo.findByBookingId(request.getBookingId()).ifPresent(existing -> {
-            if (existing.getStatus() == PaymentStatus.PAID) {
-                throw new PaymentException("Booking " + request.getBookingId()
-                        + " is already paid.");
-            }
-        });
+        // Check if already paid
+        if (bookingId != null) {
+            repo.findByBookingId(bookingId).ifPresent(p -> {
+                if (p.getStatus() == PaymentStatus.PAID) throw new PaymentException("Booking is already paid.");
+            });
+        } else if (subId != null) {
+            repo.findBySubscriptionId(subId).ifPresent(p -> {
+                if (p.getStatus() == PaymentStatus.PAID) throw new PaymentException("Subscription is already paid.");
+            });
+        } else {
+            throw new PaymentException("Either Booking ID or Subscription ID is required.");
+        }
 
         try {
-
             int amountInPaise = (int) (request.getAmount() * 100);
 
             JSONObject orderRequest = new JSONObject();
             orderRequest.put("amount",   amountInPaise);
             orderRequest.put("currency", "INR");
-            orderRequest.put("receipt",  "booking_" + request.getBookingId());
-            orderRequest.put("notes", new JSONObject()
-                    .put("bookingId",   request.getBookingId())
-                    .put("driverEmail", driverEmail));
+            orderRequest.put("receipt",  bookingId != null ? "booking_" + bookingId : "sub_" + subId);
+            
+            JSONObject notes = new JSONObject();
+            notes.put("driverEmail", driverEmail);
+            if (bookingId != null) notes.put("bookingId", bookingId);
+            if (subId != null) notes.put("subscriptionId", subId);
+            
+            orderRequest.put("notes", notes);
 
             Order razorpayOrder = razorpayClient.orders.create(orderRequest);
             String razorpayOrderId = razorpayOrder.get("id");
 
             log.info("Razorpay order created: {}", razorpayOrderId);
 
-            Payment payment = Payment.builder()
-                    .bookingId(request.getBookingId())
-                    .driverEmail(driverEmail)
-                    .amount(request.getAmount())
-                    .currency("INR")
-                    .status(PaymentStatus.PENDING)
-                    .razorpayOrderId(razorpayOrderId)
-                    .description(request.getDescription())
-                    .build();
+            // Reuse existing PENDING payment or create new
+            com.parkease.payment.entity.Payment payment;
+            if (bookingId != null) {
+                payment = repo.findByBookingId(bookingId)
+                        .filter(p -> p.getStatus() == com.parkease.payment.entity.PaymentStatus.PENDING)
+                        .orElseGet(() -> com.parkease.payment.entity.Payment.builder().bookingId(bookingId).status(com.parkease.payment.entity.PaymentStatus.PENDING).build());
+            } else {
+                payment = repo.findBySubscriptionId(subId)
+                        .filter(p -> p.getStatus() == com.parkease.payment.entity.PaymentStatus.PENDING)
+                        .orElseGet(() -> com.parkease.payment.entity.Payment.builder().subscriptionId(subId).status(com.parkease.payment.entity.PaymentStatus.PENDING).build());
+            }
+            
+            payment.setDriverEmail(driverEmail);
+            payment.setCurrency("INR");
 
-            Payment saved = repo.save(payment);
+            payment.setAmount(request.getAmount());
+            payment.setRazorpayOrderId(razorpayOrderId);
+            payment.setDescription(request.getDescription());
+
+            com.parkease.payment.entity.Payment saved = repo.save(payment);
 
             return OrderResponseDTO.builder()
                     .paymentId(saved.getPaymentId())
@@ -99,8 +126,37 @@ public class PaymentServiceImpl implements PaymentService {
                     .build();
 
         } catch (RazorpayException e) {
-            log.error("Razorpay order creation failed: {}", e.getMessage());
-            throw new PaymentException("Failed to create payment order: " + e.getMessage());
+            throw new PaymentException("Failed to create payment order: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    @Transactional
+    public void initializePayment(CreateOrderRequest request, String driverEmail) {
+        log.info("Initializing PENDING payment record for booking: {} amount: Rs.{}",
+                request.getBookingId(), request.getAmount());
+
+        repo.findByBookingId(request.getBookingId()).ifPresent(existing -> {
+            if (existing.getStatus() == PaymentStatus.PAID) {
+                throw new PaymentException("Booking " + request.getBookingId() + " is already paid.");
+            }
+            // If already exists and is PENDING, we just update the amount/description if needed
+            existing.setAmount(request.getAmount());
+            existing.setDescription(request.getDescription());
+            repo.save(existing);
+        });
+
+        if (repo.findByBookingId(request.getBookingId()).isEmpty()) {
+            Payment payment = Payment.builder()
+                    .bookingId(request.getBookingId())
+                    .driverEmail(driverEmail)
+                    .amount(request.getAmount())
+                    .currency("INR")
+                    .status(PaymentStatus.PENDING)
+                    .description(request.getDescription())
+                    .build();
+            repo.save(payment);
+            log.info("Created initial PENDING record for booking {}", request.getBookingId());
         }
     }
 
@@ -148,26 +204,36 @@ public class PaymentServiceImpl implements PaymentService {
             saved = repo.save(saved);
         }
 
+        // Publish payment success notification
+        notificationPublisher.publish(NotificationEvent.builder()
+                .recipientEmail(saved.getDriverEmail())
+                .type("PAYMENT")
+                .title("Payment Successful!")
+                .message("Your payment of Rs." + saved.getAmount()
+                        + " for booking #" + saved.getBookingId()
+                        + " was successful. Payment ID: " + saved.getRazorpayPaymentId()
+                        + ". Your receipt is available in the app.")
+                .relatedId(saved.getPaymentId())
+                .relatedType("PAYMENT")
+                .build());
+
         return mapper.toDTO(saved);
     }
+
 
     @Override
     @Transactional
     public PaymentResponseDTO refundPayment(RefundRequest request) {
-        log.info("Processing refund for booking: {}", request.getBookingId());
+        com.parkease.payment.entity.Payment payment = repo.findByBookingId(request.getBookingId())
+                .orElseThrow(() -> new ResourceNotFoundException("Payment not found for booking: " + request.getBookingId()));
 
-        Payment payment = repo.findByBookingId(request.getBookingId())
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Payment not found for booking: " + request.getBookingId()));
-
-        if (payment.getStatus() != PaymentStatus.PAID) {
+        if (payment.getStatus() != com.parkease.payment.entity.PaymentStatus.PAID) {
             throw new PaymentException(
                 "Cannot refund payment in status: " + payment.getStatus()
                 + ". Only PAID payments can be refunded.");
         }
 
         try {
-
             JSONObject refundRequest = new JSONObject();
             refundRequest.put("speed", "normal");
             if (request.getReason() != null) {
@@ -180,15 +246,29 @@ public class PaymentServiceImpl implements PaymentService {
             String refundId = refund.get("id");
             log.info("Razorpay refund created: {}", refundId);
 
-            payment.setStatus(PaymentStatus.REFUNDED);
+            payment.setStatus(com.parkease.payment.entity.PaymentStatus.REFUNDED);
             payment.setRazorpayRefundId(refundId);
             payment.setRefundedAt(LocalDateTime.now());
 
-            return mapper.toDTO(repo.save(payment));
+            com.parkease.payment.entity.Payment saved = repo.save(payment);
+
+            // Publish refund notification
+            notificationPublisher.publish(NotificationEvent.builder()
+                    .recipientEmail(saved.getDriverEmail())
+                    .type("PAYMENT")
+                    .title("Refund Initiated")
+                    .message("A refund of Rs." + saved.getAmount()
+                            + " for booking #" + saved.getBookingId()
+                            + " has been initiated. Refund ID: " + refundId
+                            + ". It will reflect in 5-7 business days.")
+                    .relatedId(saved.getPaymentId())
+                    .relatedType("PAYMENT")
+                    .build());
+
+            return mapper.toDTO(saved);
 
         } catch (RazorpayException e) {
-            log.error("Refund failed for payment {}: {}", payment.getPaymentId(), e.getMessage());
-            throw new PaymentException("Refund failed: " + e.getMessage());
+            throw new PaymentException("Refund failed for payment " + payment.getPaymentId() + ": " + e.getMessage(), e);
         }
     }
 
@@ -208,8 +288,11 @@ public class PaymentServiceImpl implements PaymentService {
 
     @Override
     public List<PaymentResponseDTO> getMyPayments(String driverEmail) {
-        return repo.findByDriverEmailOrderByCreatedAtDesc(driverEmail)
-                .stream().map(mapper::toDTO).toList();
+        String normalizedEmail = driverEmail == null ? "" : driverEmail.trim().toLowerCase();
+        log.info("getMyPayments query for email: '{}'", normalizedEmail);
+        List<com.parkease.payment.entity.Payment> results = repo.findByDriverEmailOrderByCreatedAtDesc(normalizedEmail);
+        log.info("DB returned {} payment records for '{}'", results.size(), normalizedEmail);
+        return results.stream().map(mapper::toDTO).toList();
     }
 
     @Override
@@ -218,8 +301,42 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     @Override
+    public long getPendingPaymentsCount(String driverEmail) {
+        return repo.countByDriverEmailAndStatusIn(driverEmail, List.of(PaymentStatus.PENDING, PaymentStatus.FAILED));
+    }
+
+    @Override
+    @Transactional
+    public void initializeSubscriptionPayment(com.parkease.payment.dto.request.SubscriptionPaymentRequest request) {
+        log.info("=== initializeSubscriptionPayment called === Sub: {}, Email: {}, Amount: {}",
+                request.getSubscriptionId(), request.getDriverEmail(), request.getAmount());
+
+        if (request.getDriverEmail() == null || request.getDriverEmail().isBlank()) {
+            log.error("Cannot create subscription payment - driverEmail is null/blank for sub #{}", request.getSubscriptionId());
+            return;
+        }
+        if (request.getAmount() == null || request.getAmount() <= 0) {
+            log.error("Cannot create subscription payment - amount is invalid ({}) for sub #{}", request.getAmount(), request.getSubscriptionId());
+            return;
+        }
+
+        // Always create a fresh PENDING payment for each cancellation
+        com.parkease.payment.entity.Payment payment = new com.parkease.payment.entity.Payment();
+        payment.setSubscriptionId(request.getSubscriptionId());
+        payment.setDriverEmail(request.getDriverEmail().trim().toLowerCase());
+        payment.setAmount(request.getAmount());
+        payment.setCurrency("INR");
+        payment.setStatus(com.parkease.payment.entity.PaymentStatus.PENDING);
+        payment.setDescription(request.getDescription());
+
+        com.parkease.payment.entity.Payment saved = repo.save(payment);
+        log.info("=== Subscription payment record saved === paymentId: {}, sub: {}, email: {}, amount: {}",
+                saved.getPaymentId(), saved.getSubscriptionId(), saved.getDriverEmail(), saved.getAmount());
+    }
+
+    @Override
     public String getReceiptPath(Long paymentId, String driverEmail) {
-        Payment payment = getOrThrow(paymentId);
+        com.parkease.payment.entity.Payment payment = getOrThrow(paymentId);
 
         if (!payment.getDriverEmail().equals(driverEmail)) {
             throw new ResourceNotFoundException("Payment not found with id: " + paymentId);
@@ -240,6 +357,8 @@ public class PaymentServiceImpl implements PaymentService {
         return payment.getReceiptPath();
     }
 
+    // â”€â”€ private helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
     private boolean verifySignature(String orderId, String paymentId, String signature) {
         try {
             String payload = orderId + "|" + paymentId;
@@ -259,10 +378,10 @@ public class PaymentServiceImpl implements PaymentService {
     private com.parkease.payment.entity.PaymentMode mapPaymentMethod(String method) {
         if (method == null) return null;
         return switch (method.toLowerCase()) {
-            case "card"        -> com.parkease.payment.entity.PaymentMode.CARD;
-            case "upi"         -> com.parkease.payment.entity.PaymentMode.UPI;
-            case "netbanking"  -> com.parkease.payment.entity.PaymentMode.NETBANKING;
-            default            -> null;
+            case "card"       -> com.parkease.payment.entity.PaymentMode.CARD;
+            case "upi"        -> com.parkease.payment.entity.PaymentMode.UPI;
+            case "netbanking" -> com.parkease.payment.entity.PaymentMode.NETBANKING;
+            default           -> null;
         };
     }
 }

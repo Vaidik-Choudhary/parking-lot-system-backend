@@ -3,7 +3,6 @@ package com.parkease.auth.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.Instant;
-import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "refresh_tokens")

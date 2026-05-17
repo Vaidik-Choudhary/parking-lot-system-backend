@@ -22,6 +22,11 @@ public class ParkingLotMapper {
                 .isApproved(false)                    
                 .openTime(dto.getOpenTime())
                 .closeTime(dto.getCloseTime())
+                .handicappedFriendly(dto.isHandicappedFriendly())
+                .hasEV(dto.isHasEV())
+                .hasTwoWheeler(dto.isHasTwoWheeler())
+                .hasFourWheeler(dto.isHasFourWheeler())
+                .hasHeavy(dto.isHasHeavy())
                 .imageUrl(dto.getImageUrl())
                 .build();
     }
@@ -41,6 +46,11 @@ public class ParkingLotMapper {
                 .isApproved(lot.isApproved())
                 .openTime(lot.getOpenTime())
                 .closeTime(lot.getCloseTime())
+                .isHandicappedFriendly(lot.isHandicappedFriendly())
+                .hasEV(lot.isHasEV())
+                .hasTwoWheeler(lot.isHasTwoWheeler())
+                .hasFourWheeler(lot.isHasFourWheeler())
+                .hasHeavy(lot.isHasHeavy())
                 .imageUrl(lot.getImageUrl())
                 .createdAt(lot.getCreatedAt())
                 .build();

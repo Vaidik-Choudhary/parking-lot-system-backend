@@ -51,6 +51,21 @@ public class ParkingLot {
     private LocalTime openTime;
     private LocalTime closeTime;
 
+    @Column(name = "is_handicapped_friendly", nullable = false)
+    private boolean handicappedFriendly = false;
+
+    @Column(name = "hasev", nullable = false)
+    private boolean hasEV = false;
+
+    @Column(name = "has_two_wheeler", nullable = false)
+    private boolean hasTwoWheeler = false;
+
+    @Column(name = "has_four_wheeler", nullable = false)
+    private boolean hasFourWheeler = false;
+
+    @Column(name = "has_heavy", nullable = false)
+    private boolean hasHeavy = false;
+
     private String imageUrl;
 
     @Column(nullable = false, updatable = false)

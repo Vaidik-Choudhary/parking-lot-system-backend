@@ -90,24 +90,26 @@ class ParkingLotServiceImplTest {
 
     @Test
     void shouldGetLotsByCitySuccessfully() {
-        when(repo.findByCityIgnoreCaseAndIsApprovedTrue("Bhopal"))
+        when(repo.findByCityWithFilters("Bhopal", null, null, null, null, null))
                 .thenReturn(List.of(lot));
         when(mapper.toDTO(lot)).thenReturn(responseDTO);
 
-        List<ParkingLotResponseDTO> result = service.getByCity("Bhopal");
+        List<ParkingLotResponseDTO> result = service.getByCity("Bhopal", null, null, null, null, null);
 
         assertEquals(1, result.size());
     }
 
     @Test
     void shouldGetNearbyLotsSuccessfully() {
-        when(repo.findNearby(23.2599, 77.4126, 5.0))
+        com.parkease.parkinglot.dto.request.NearbySearchRequest req = com.parkease.parkinglot.dto.request.NearbySearchRequest.builder()
+                .lat(23.2599).lon(77.4126).radiusKm(5.0).build();
+
+        when(repo.findNearbyWithFilters(any(com.parkease.parkinglot.dto.request.NearbySearchRequest.class)))
                 .thenReturn(List.of(lot));
         when(mapper.toDTO(eq(lot), anyDouble()))
                 .thenReturn(responseDTO);
 
-        List<ParkingLotResponseDTO> result =
-                service.getNearbyLots(23.2599, 77.4126, 5.0);
+        List<ParkingLotResponseDTO> result = service.getNearbyLots(req);
 
         assertEquals(1, result.size());
     }

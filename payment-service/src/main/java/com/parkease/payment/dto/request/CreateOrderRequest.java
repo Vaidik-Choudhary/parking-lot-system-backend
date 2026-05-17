@@ -1,17 +1,13 @@
 package com.parkease.payment.dto.request;
 
-import jakarta.validation.constraints.*;
-import lombok.Data;
-
+import lombok.*;
+import lombok.experimental.SuperBuilder;
 
 @Data
-public class CreateOrderRequest {
-
-    @NotNull(message = "Booking ID is required")
+@SuperBuilder
+@NoArgsConstructor
+@AllArgsConstructor
+@EqualsAndHashCode(callSuper = true)
+public class CreateOrderRequest extends BasePaymentRequest {
     private Long bookingId;
-
-    @DecimalMin(value = "1.0", message = "Amount must be at least ₹1")
-    private double amount;
-
-    private String description;
 }

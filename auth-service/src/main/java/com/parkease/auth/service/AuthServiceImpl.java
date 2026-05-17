@@ -30,6 +30,7 @@ public class AuthServiceImpl implements AuthService {
     private final AuthenticationManager     authenticationManager;
     private final RefreshTokenService       refreshTokenService;
     private final EmailService              emailService;
+    private static final String USER_NOT_FOUND = "User not found.";
 
     @Override
     @Transactional
@@ -66,7 +67,7 @@ public class AuthServiceImpl implements AuthService {
 
         try {
 
-            Authentication authentication = authenticationManager.authenticate(
+            authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(
                             request.getEmail(),
                             request.getPassword()
@@ -82,7 +83,7 @@ public class AuthServiceImpl implements AuthService {
         }
 
         User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new ResourceNotFoundException("User not found."));
+                .orElseThrow(() -> new ResourceNotFoundException(USER_NOT_FOUND));
 
         String accessToken  = jwtUtil.generateToken(user.getEmail(), user.getRole().name());
         String refreshToken = refreshTokenService.createRefreshToken(user).getToken();
@@ -107,7 +108,7 @@ public class AuthServiceImpl implements AuthService {
     public void logout(String email) {
         log.info("Logging out user: {}", email);
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found."));
+                .orElseThrow(() -> new ResourceNotFoundException(USER_NOT_FOUND));
         refreshTokenService.deleteByUser(user);
     }
 
@@ -163,8 +164,24 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public UserResponse getProfile(String email) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found."));
+                .orElseThrow(() -> new ResourceNotFoundException(USER_NOT_FOUND));
         return mapToUserResponse(user);
+    }
+
+    @Override
+    @Transactional
+    public void changePassword(String email, ChangePasswordRequest request) {
+        log.info("Changing password for user: {}", email);
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException(USER_NOT_FOUND));
+
+        if (!passwordEncoder.matches(request.getOldPassword(), user.getPassword())) {
+            throw new BadCredentialsException("Invalid old password.");
+        }
+
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
+        log.info("Password changed successfully for: {}", email);
     }
 
 

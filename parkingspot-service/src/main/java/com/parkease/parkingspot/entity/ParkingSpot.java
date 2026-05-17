@@ -46,6 +46,11 @@ public class ParkingSpot {
     @Column(nullable = false)
     private double pricePerHour;
 
+    @Column(nullable = false)
+    private boolean monthlySubscriptionEnabled = false;
+
+    private Double monthlyRate;
+
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

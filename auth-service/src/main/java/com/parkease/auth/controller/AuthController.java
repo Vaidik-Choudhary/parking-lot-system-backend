@@ -12,7 +12,6 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
-
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
@@ -73,7 +72,7 @@ public class AuthController {
     /**
      * POST /api/auth/forgot-password
      * Body: { "email": "john@example.com" }
-     * Returns: success message (always, even if email doesn't exist — for security)
+     * Returns: success message (always, even if email doesn't exist â€” for security)
      */
     @PostMapping("/forgot-password")
     public ResponseEntity<ApiResponse> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
@@ -106,5 +105,19 @@ public class AuthController {
         log.info("GET /api/auth/me - user: {}", userDetails.getUsername());
         UserResponse profile = authService.getProfile(userDetails.getUsername());
         return ResponseEntity.ok(profile);
+    }
+
+    /**
+     * POST /api/auth/change-password
+     * Body: { "oldPassword": "...", "newPassword": "..." }
+     */
+    @PostMapping("/change-password")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse> changePassword(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @Valid @RequestBody ChangePasswordRequest request) {
+        log.info("POST /api/auth/change-password - user: {}", userDetails.getUsername());
+        authService.changePassword(userDetails.getUsername(), request);
+        return ResponseEntity.ok(ApiResponse.ok("Password changed successfully."));
     }
 }

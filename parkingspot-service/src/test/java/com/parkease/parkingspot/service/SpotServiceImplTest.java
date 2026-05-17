@@ -46,7 +46,7 @@ class SpotServiceImplTest {
                 .lotId(10L)
                 .spotNumber("A1-01")
                 .floor(1)
-                .spotType(SpotType.COMPACT)
+                .spotType(SpotType.STANDARD)
                 .vehicleType(VehicleType.FOUR_WHEELER)
                 .status(SpotStatus.AVAILABLE)
                 .pricePerHour(50.0)
@@ -56,7 +56,7 @@ class SpotServiceImplTest {
         requestDTO.setLotId(10L);
         requestDTO.setSpotNumber("A1-01");
         requestDTO.setFloor(1);
-        requestDTO.setSpotType(SpotType.COMPACT);
+        requestDTO.setSpotType(SpotType.STANDARD);
         requestDTO.setVehicleType(VehicleType.FOUR_WHEELER);
         requestDTO.setPricePerHour(50.0);
 
@@ -91,7 +91,7 @@ class SpotServiceImplTest {
         dto.setPrefix("A");
         dto.setFloor(1);
         dto.setCount(2);
-        dto.setSpotType(SpotType.COMPACT);
+        dto.setSpotType(SpotType.STANDARD);
         dto.setVehicleType(VehicleType.FOUR_WHEELER);
         dto.setPricePerHour(50.0);
 
@@ -193,5 +193,27 @@ class SpotServiceImplTest {
         int result = service.countAvailableSpots(10L);
 
         assertEquals(5, result);
+    }
+
+    @Test
+    void getSpotById_Success() {
+        when(repo.findById(1L)).thenReturn(Optional.of(spot));
+        when(mapper.toDTO(spot)).thenReturn(responseDTO);
+        assertNotNull(service.getSpotById(1L));
+    }
+
+    @Test
+    void getSpotsByLot_Success() {
+        when(repo.findByLotId(10L)).thenReturn(List.of(spot));
+        when(mapper.toDTO(spot)).thenReturn(responseDTO);
+        assertEquals(1, service.getSpotsByLot(10L).size());
+    }
+
+    @Test
+    void updateSpot_Success() {
+        when(repo.findById(1L)).thenReturn(Optional.of(spot));
+        when(repo.save(any())).thenReturn(spot);
+        when(mapper.toDTO(spot)).thenReturn(responseDTO);
+        assertNotNull(service.updateSpot(1L, requestDTO));
     }
 }

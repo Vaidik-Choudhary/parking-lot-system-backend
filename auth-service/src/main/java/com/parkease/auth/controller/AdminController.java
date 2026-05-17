@@ -11,6 +11,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import com.parkease.auth.annotation.TrackExecutionTime;
 
 @RestController
 @RequestMapping("/api/admin")
@@ -20,7 +21,10 @@ import java.util.List;
 public class AdminController {
 
     private final UserRepository userRepository;
+    
+    private static final String USER_NOT_FOUND = "User not found with id: ";
 
+    @TrackExecutionTime
     @GetMapping("/users")
     public ResponseEntity<List<UserResponse>> getAllUsers() {
         log.info("GET /api/admin/users");
@@ -31,39 +35,48 @@ public class AdminController {
         return ResponseEntity.ok(users);
     }
 
+    @TrackExecutionTime
     @GetMapping("/users/{id}")
     public ResponseEntity<UserResponse> getUserById(@PathVariable Long id) {
         log.info("GET /api/admin/users/{}", id);
         User user = userRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException(USER_NOT_FOUND + id));
         return ResponseEntity.ok(toResponse(user));
     }
 
+    @TrackExecutionTime
     @PutMapping("/users/{id}/suspend")
     public ResponseEntity<ApiResponse> suspendUser(@PathVariable Long id) {
         log.info("PUT /api/admin/users/{}/suspend", id);
         User user = userRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException(USER_NOT_FOUND + id));
+        if (user.getRole() == Role.ADMIN) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail("Cannot suspend an admin user."));
+        }
         user.setActive(false);
         userRepository.save(user);
         return ResponseEntity.ok(ApiResponse.ok("User suspended successfully."));
     }
 
+    @TrackExecutionTime
     @PutMapping("/users/{id}/activate")
     public ResponseEntity<ApiResponse> activateUser(@PathVariable Long id) {
         log.info("PUT /api/admin/users/{}/activate", id);
         User user = userRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException(USER_NOT_FOUND + id));
         user.setActive(true);
         userRepository.save(user);
         return ResponseEntity.ok(ApiResponse.ok("User activated successfully."));
     }
 
+    @TrackExecutionTime
     @DeleteMapping("/users/{id}")
     public ResponseEntity<ApiResponse> deleteUser(@PathVariable Long id) {
         log.info("DELETE /api/admin/users/{}", id);
-        if (!userRepository.existsById(id)) {
-            throw new ResourceNotFoundException("User not found with id: " + id);
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException(USER_NOT_FOUND + id));
+        if (user.getRole() == Role.ADMIN) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail("Cannot delete an admin user."));
         }
         userRepository.deleteById(id);
         return ResponseEntity.ok(ApiResponse.ok("User deleted successfully."));

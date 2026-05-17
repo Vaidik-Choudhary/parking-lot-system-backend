@@ -26,8 +26,15 @@ public class SecurityConfig {
             .csrf(AbstractHttpConfigurer::disable)
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-            		
-                .requestMatchers("/api/notifications/send").permitAll()
+		
+                .requestMatchers(
+                    "/swagger-ui/**",
+                    "/swagger-ui.html",
+                    "/v3/api-docs/**",
+                    "/v3/api-docs.yaml",
+                    "/api/notifications/send",
+                    "/actuator/**"
+                ).permitAll()
                 .requestMatchers("/api/notifications/broadcast").hasRole("ADMIN")
                 .anyRequest().authenticated()
             )

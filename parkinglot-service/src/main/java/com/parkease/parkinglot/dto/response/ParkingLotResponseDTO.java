@@ -1,35 +1,27 @@
 package com.parkease.parkinglot.dto.response;
 
+import com.parkease.parkinglot.dto.BaseParkingLotDTO;
 import lombok.*;
+import lombok.experimental.SuperBuilder;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 
 @Data
-@Builder
+@SuperBuilder
 @NoArgsConstructor
 @AllArgsConstructor
-public class ParkingLotResponseDTO {
+@EqualsAndHashCode(callSuper = true)
+public class ParkingLotResponseDTO extends BaseParkingLotDTO {
 
     private Long lotId;
-    private String name;
-    private String address;
-    private String city;
-
     private double latitude;
     private double longitude;
 
-    private int totalSpots;
     private int availableSpots;
 
     private Long managerId;
 
     private boolean isOpen;
     private boolean isApproved;
-
-    private LocalTime openTime;
-    private LocalTime closeTime;
-
-    private String imageUrl;
 
     private LocalDateTime createdAt;
 

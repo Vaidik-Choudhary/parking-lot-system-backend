@@ -8,21 +8,25 @@ import org.springframework.stereotype.Component;
 public class PaymentMapper {
 
     public PaymentResponseDTO toDTO(Payment p) {
-        return PaymentResponseDTO.builder()
-                .paymentId(p.getPaymentId())
-                .bookingId(p.getBookingId())
-                .driverEmail(p.getDriverEmail())
-                .amount(p.getAmount())
-                .currency(p.getCurrency())
-                .status(p.getStatus())
-                .mode(p.getMode())
-                .razorpayOrderId(p.getRazorpayOrderId())
-                .razorpayPaymentId(p.getRazorpayPaymentId())
-                .razorpayRefundId(p.getRazorpayRefundId())
-                .description(p.getDescription())
-                .createdAt(p.getCreatedAt())
-                .paidAt(p.getPaidAt())
-                .refundedAt(p.getRefundedAt())
-                .build();
+        if (p == null) return null;
+        
+        PaymentResponseDTO dto = new PaymentResponseDTO();
+        dto.setPaymentId(p.getPaymentId());
+        dto.setBookingId(p.getBookingId());
+        dto.setSubscriptionId(p.getSubscriptionId());
+        dto.setDriverEmail(p.getDriverEmail());
+        dto.setAmount(p.getAmount());
+        dto.setCurrency(p.getCurrency());
+        dto.setStatus(p.getStatus());
+        dto.setMode(p.getMode());
+        dto.setRazorpayOrderId(p.getRazorpayOrderId());
+        dto.setRazorpayPaymentId(p.getRazorpayPaymentId());
+        dto.setRazorpayRefundId(p.getRazorpayRefundId());
+        dto.setDescription(p.getDescription());
+        dto.setCreatedAt(p.getCreatedAt());
+        dto.setPaidAt(p.getPaidAt());
+        dto.setRefundedAt(p.getRefundedAt());
+        
+        return dto;
     }
 }

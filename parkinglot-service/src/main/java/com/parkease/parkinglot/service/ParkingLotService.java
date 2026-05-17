@@ -7,25 +7,25 @@ import java.util.List;
 
 public interface ParkingLotService {
 
-    // ── Manager operations ────────────────────────────────────────────────────
+    // â”€â”€ Manager operations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     ParkingLotResponseDTO createLot(ParkingLotRequestDTO dto, String managerEmail);
     ParkingLotResponseDTO updateLot(Long id, ParkingLotRequestDTO dto, String managerEmail);
     void deleteLot(Long id, String managerEmail);
     ParkingLotResponseDTO toggleOpen(Long id, String managerEmail);
     List<ParkingLotResponseDTO> getLotsByManager(String managerEmail);
 
-    // ── Public / Driver operations ────────────────────────────────────────────
+    // â”€â”€ Public / Driver operations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     ParkingLotResponseDTO getLotById(Long id);
-    List<ParkingLotResponseDTO> getByCity(String city);
-    List<ParkingLotResponseDTO> getNearbyLots(double lat, double lon, double radiusKm);
+    List<ParkingLotResponseDTO> getByCity(String city, Boolean hasEV, Boolean has2W, Boolean has4W, Boolean hasHeavy, Boolean hasHandicap);
+    List<ParkingLotResponseDTO> getNearbyLots(com.parkease.parkinglot.dto.request.NearbySearchRequest searchReq);
     List<ParkingLotResponseDTO> getOpenLots();
 
-    // ── Admin operations ──────────────────────────────────────────────────────
+    // â”€â”€ Admin operations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     ParkingLotResponseDTO approveLot(Long id);
     ParkingLotResponseDTO rejectLot(Long id);
     List<ParkingLotResponseDTO> getPendingApprovalLots();
 
-    // ── Internal (called by booking-service) ─────────────────────────────────
+    // â”€â”€ Internal (called by booking-service) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     void decrementSpot(Long lotId);
     void incrementSpot(Long lotId);
 }

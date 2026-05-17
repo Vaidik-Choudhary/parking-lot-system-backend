@@ -1,5 +1,11 @@
 package com.parkease.notification.entity;
 
+/**
+ * Types of notifications that ParkEase can send.
+ *
+ * MANAGER_ALERT â€“ Notifications directed at Lot Managers:
+ *                 new bookings, check-in/out events, upcoming arrivals.
+ */
 public enum NotificationType {
     BOOKING_CONFIRMED,
     CHECKIN,
@@ -9,5 +15,6 @@ public enum NotificationType {
     CANCELLATION,
     NEW_BOOKING,
     LOT_APPROVED,
-    BROADCAST
+    BROADCAST,
+    MANAGER_ALERT
 }

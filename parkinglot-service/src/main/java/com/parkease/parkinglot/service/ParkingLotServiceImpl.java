@@ -40,7 +40,7 @@ public class ParkingLotServiceImpl implements ParkingLotService {
         log.info("Creating lot '{}' for manager: {}", dto.getName(), managerEmail);
         ParkingLot lot = mapper.toEntity(dto, managerEmail);
         ParkingLot saved = repo.save(lot);
-        log.info("Lot created with id: {} — pending admin approval", saved.getLotId());
+        log.info("Lot created with id: {} â€” pending admin approval", saved.getLotId());
         return mapper.toDTO(saved);
     }
 
@@ -51,24 +51,24 @@ public class ParkingLotServiceImpl implements ParkingLotService {
     }
 
     @Override
-    public List<ParkingLotResponseDTO> getByCity(String city) {
-        log.debug("Fetching lots in city: {}", city);
-        return repo.findByCityIgnoreCaseAndIsApprovedTrue(city)
+    public List<ParkingLotResponseDTO> getByCity(String city, Boolean hasEV, Boolean has2W, Boolean has4W, Boolean hasHeavy, Boolean hasHandicap) {
+        log.debug("Fetching lots in city: {} with filters", city);
+        return repo.findByCityWithFilters(city, hasEV, has2W, has4W, hasHeavy, hasHandicap)
                 .stream()
                 .map(mapper::toDTO)
                 .toList();
     }
 
     @Override
-    public List<ParkingLotResponseDTO> getNearbyLots(double lat, double lon, double radiusKm) {
-        log.debug("Finding lots near ({}, {}) within {} km", lat, lon, radiusKm);
+    public List<ParkingLotResponseDTO> getNearbyLots(com.parkease.parkinglot.dto.request.NearbySearchRequest req) {
+        log.debug("Finding lots near ({}, {}) with filters", req.getLat(), req.getLon());
 
-        List<ParkingLot> lots = repo.findNearby(lat, lon, radiusKm);
+        List<ParkingLot> lots = repo.findNearbyWithFilters(req);
 
         return lots.stream()
                 .map(lot -> {
                     double distance = HaversineUtil.calculateDistance(
-                            lat, lon,
+                            req.getLat(), req.getLon(),
                             lot.getLatitude(), lot.getLongitude()
                     );
                     return mapper.toDTO(lot, distance);
@@ -109,6 +109,11 @@ public class ParkingLotServiceImpl implements ParkingLotService {
         lot.setTotalSpots(dto.getTotalSpots());
         lot.setOpenTime(dto.getOpenTime());
         lot.setCloseTime(dto.getCloseTime());
+        lot.setHandicappedFriendly(dto.isHandicappedFriendly());
+        lot.setHasEV(dto.isHasEV());
+        lot.setHasTwoWheeler(dto.isHasTwoWheeler());
+        lot.setHasFourWheeler(dto.isHasFourWheeler());
+        lot.setHasHeavy(dto.isHasHeavy());
         lot.setImageUrl(dto.getImageUrl());
 
         return mapper.toDTO(repo.save(lot));

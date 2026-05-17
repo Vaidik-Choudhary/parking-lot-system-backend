@@ -1,23 +1,23 @@
 package com.parkease.payment.entity;
 
-import jakarta.persistence.*;
 import lombok.*;
+import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "payments")
 @Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 public class Payment {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long paymentId;
 
-    @Column(nullable = false, unique = true)
     private Long bookingId;
+    private Long subscriptionId;
     
     @Column(nullable = false)
     private String driverEmail;
@@ -26,6 +26,7 @@ public class Payment {
     private double amount;
 
     @Column(nullable = false)
+    @Builder.Default
     private String currency = "INR";
 
     @Enumerated(EnumType.STRING)
@@ -36,15 +37,10 @@ public class Payment {
     private PaymentMode mode;
 
     private String razorpayOrderId;
-
     private String razorpayPaymentId;
-
     private String razorpaySignature;
-
     private String razorpayRefundId;
-
     private String receiptPath;
-
     private String description;
 
     @Column(nullable = false, updatable = false)

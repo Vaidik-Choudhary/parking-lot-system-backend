@@ -1,15 +1,15 @@
 package com.parkease.analytics.service;
 
+import com.parkease.analytics.client.BookingServiceClient;
+import com.parkease.analytics.client.PaymentServiceClient;
+import com.parkease.analytics.client.SpotServiceClient;
 import com.parkease.analytics.dto.response.*;
 import com.parkease.analytics.entity.OccupancyLog;
 import com.parkease.analytics.repository.OccupancyLogRepository;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.*;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -23,19 +23,46 @@ import java.util.stream.Collectors;
 public class AnalyticsServiceImpl implements AnalyticsService {
 
     private final OccupancyLogRepository logRepo;
-    private final RestTemplate restTemplate;
-
-    @Value("${app.services.booking-service}")
-    private String bookingServiceUrl;
-
-    @Value("${app.services.payment-service}")
-    private String paymentServiceUrl;
+    private final BookingServiceClient   bookingServiceClient;
+    private final PaymentServiceClient   paymentServiceClient;
+    private final SpotServiceClient      spotServiceClient;
+    
+    private static final String STATUS = "status";
+    private static final String COMPLETED = "COMPLETED";
 
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
     @Override
     public OccupancyRateDTO getOccupancyRate(Long lotId) {
         log.debug("Getting occupancy rate for lot: {}", lotId);
+
+        try {
+            List<Map<String, Object>> spots = spotServiceClient.getSpotsByLot(lotId);
+            if (spots != null) {
+                int total = spots.size();
+                int occupied = (int) spots.stream()
+                        .filter(s -> "OCCUPIED".equals(s.get(STATUS)) || "RESERVED".equals(s.get(STATUS)))
+                        .count();
+                
+                int availableCount = (int) spots.stream()
+                        .filter(s -> "AVAILABLE".equals(s.get(STATUS)))
+                        .count();
+                
+                double rate = total > 0 ? (double) occupied / total : 0.0;
+                double percent = Math.round(rate * 100.0 * 100.0) / 100.0;
+
+                return OccupancyRateDTO.builder()
+                        .lotId(lotId)
+                        .occupiedSpots(occupied)
+                        .totalSpots(total)
+                        .occupancyRate(Math.round(rate * 10000.0) / 10000.0)
+                        .occupancyPercent(percent)
+                        .availableSpots(availableCount)
+                        .build();
+            }
+        } catch (Exception e) {
+            log.error("Failed to fetch real-time spot data for lot {}, falling back to latest log: {}", lotId, e.getMessage());
+        }
 
         OccupancyLog latest = logRepo.findTopByLotIdOrderByTimestampDesc(lotId);
 
@@ -93,10 +120,10 @@ public class AnalyticsServiceImpl implements AnalyticsService {
     public RevenueReportDTO getRevenueReport(Long lotId, LocalDate from, LocalDate to, String token) {
         log.debug("Getting revenue report for lot: {} from {} to {}", lotId, from, to);
 
-        List<Map> bookings = fetchBookingsForLot(lotId, token);
+        List<Map<String, Object>> bookings = fetchBookingsForLot(lotId, token);
 
-        List<Map> completed = bookings.stream()
-                .filter(b -> "COMPLETED".equals(b.get("status")))
+        List<Map<String, Object>> completed = bookings.stream()
+                .filter(b -> COMPLETED.equals(b.get(STATUS)))
                 .filter(b -> {
                     String createdAt = (String) b.get("createdAt");
                     if (createdAt == null) return false;
@@ -108,7 +135,7 @@ public class AnalyticsServiceImpl implements AnalyticsService {
         Map<String, Double> revenueByDay = new TreeMap<>();
         double totalRevenue = 0.0;
 
-        for (Map booking : completed) {
+        for (Map<String, Object> booking : completed) {
             String dateStr = ((String) booking.get("createdAt")).substring(0, 10);
             double amount  = booking.get("totalAmount") != null
                     ? ((Number) booking.get("totalAmount")).doubleValue() : 0.0;
@@ -131,14 +158,13 @@ public class AnalyticsServiceImpl implements AnalyticsService {
     public Map<String, Double> getSpotTypeUtilisation(Long lotId, String token) {
         log.debug("Getting spot type utilisation for lot: {}", lotId);
 
-        List<Map> bookings = fetchBookingsForLot(lotId, token);
+        List<Map<String, Object>> bookings = fetchBookingsForLot(lotId, token);
 
         Map<String, Long> countByType = new HashMap<>();
         long total = 0;
 
-        for (Map booking : bookings) {
-            if ("COMPLETED".equals(booking.get("status"))) {
-        
+        for (Map<String, Object> booking : bookings) {
+            if (COMPLETED.equals(booking.get(STATUS))) {
                 String vehicleType = (String) booking.get("vehicleType");
                 if (vehicleType != null) {
                     countByType.merge(vehicleType, 1L, Long::sum);
@@ -162,10 +188,10 @@ public class AnalyticsServiceImpl implements AnalyticsService {
     public double getAvgParkingDuration(Long lotId, String token) {
         log.debug("Getting avg parking duration for lot: {}", lotId);
 
-        List<Map> bookings = fetchBookingsForLot(lotId, token);
+        List<Map<String, Object>> bookings = fetchBookingsForLot(lotId, token);
 
-        List<Map> completed = bookings.stream()
-                .filter(b -> "COMPLETED".equals(b.get("status"))
+        List<Map<String, Object>> completed = bookings.stream()
+                .filter(b -> COMPLETED.equals(b.get(STATUS))
                           && b.get("checkInTime") != null
                           && b.get("checkOutTime") != null)
                 .toList();
@@ -173,7 +199,7 @@ public class AnalyticsServiceImpl implements AnalyticsService {
         if (completed.isEmpty()) return 0.0;
 
         double totalMinutes = 0;
-        for (Map booking : completed) {
+        for (Map<String, Object> booking : completed) {
             try {
                 LocalDateTime checkIn  = LocalDateTime.parse(
                         ((String) booking.get("checkInTime")).replace("Z", ""));
@@ -192,16 +218,16 @@ public class AnalyticsServiceImpl implements AnalyticsService {
     public LotSummaryDTO getLotSummary(Long lotId, String token) {
         log.debug("Getting full summary for lot: {}", lotId);
 
-        OccupancyRateDTO occupancy = getOccupancyRate(lotId);
-        List<Integer> peakHours   = getPeakHours(lotId, 3);
-        double avgDuration        = getAvgParkingDuration(lotId,token);
-        Map<String, Double> spotUtil = getSpotTypeUtilisation(lotId,token);
+        OccupancyRateDTO occupancy   = getOccupancyRate(lotId);
+        List<Integer>    peakHours   = getPeakHours(lotId, 3);
+        double           avgDuration = getAvgParkingDuration(lotId, token);
+        Map<String, Double> spotUtil = getSpotTypeUtilisation(lotId, token);
 
-        LocalDate today     = LocalDate.now();
+        LocalDate today      = LocalDate.now();
         LocalDate monthStart = today.withDayOfMonth(1);
 
-        RevenueReportDTO todayRevenue  = getRevenueReport(lotId, today, today, token);
-        RevenueReportDTO monthRevenue  = getRevenueReport(lotId, monthStart, today, token);
+        RevenueReportDTO todayRevenue   = getRevenueReport(lotId, today, today, token);
+        RevenueReportDTO monthRevenue   = getRevenueReport(lotId, monthStart, today, token);
         RevenueReportDTO allTimeRevenue = getRevenueReport(lotId, LocalDate.of(2020, 1, 1), today, token);
 
         return LotSummaryDTO.builder()
@@ -222,24 +248,39 @@ public class AnalyticsServiceImpl implements AnalyticsService {
     }
 
     @Override
-    public PlatformSummaryDTO getPlatformSummary( String token) {
+    public PlatformSummaryDTO getPlatformSummary(String token) {
         log.debug("Computing platform-wide summary");
 
         List<Object[]> latestLogs = logRepo.getLatestOccupancyAllLots();
 
-        int totalLots     = latestLogs.size();
+        double totalOccupied = 0;
         int totalSpots    = 0;
-        int totalOccupied = 0;
+        int totalLots     = latestLogs.size();
 
-        for (Object[] row : latestLogs) {
-            totalOccupied += ((Number) row[2]).intValue();
-            totalSpots    += ((Number) row[3]).intValue();
+        if (latestLogs.isEmpty()) {
+            // Fallback: try to get real-time summary for active lots if logs are missing
+            List<Long> activeLotIds = fetchActiveLotIds();
+            totalLots = activeLotIds.size();
+            for (Long lotId : activeLotIds) {
+                try {
+                    OccupancyRateDTO rate = getOccupancyRate(lotId);
+                    totalOccupied += rate.getOccupiedSpots();
+                    totalSpots += rate.getTotalSpots();
+                } catch (Exception e) {
+                    log.warn("Failed to get real-time occupancy for lot {} during summary", lotId);
+                }
+            }
+        } else {
+            for (Object[] row : latestLogs) {
+                totalOccupied += ((Number) row[2]).intValue();
+                totalSpots    += ((Number) row[3]).intValue();
+            }
         }
 
         double platformRate = totalSpots > 0
                 ? Math.round((totalOccupied * 100.0 / totalSpots) * 100.0) / 100.0 : 0.0;
 
-        List<Map> allBookings = fetchAllBookings();
+        List<Map<String, Object>> allBookings = fetchAllBookings(token);
 
         LocalDate today = LocalDate.now();
         long bookingsToday = allBookings.stream()
@@ -248,13 +289,13 @@ public class AnalyticsServiceImpl implements AnalyticsService {
                     return ca != null && ca.startsWith(today.format(DATE_FMT));
                 }).count();
 
-        double revenueToday    = fetchTotalRevenue(today, today);
-        double revenueAllTime  = fetchTotalRevenue(LocalDate.of(2020,1,1), today);
+        double revenueToday   = fetchTotalRevenue(today, today, token);
+        double revenueAllTime = fetchTotalRevenue(LocalDate.of(2020, 1, 1), today, token);
 
-        Map<String, Long> byCity = new HashMap<>();
+        Map<String, Long> byCity        = new HashMap<>();
         Map<String, Long> byVehicleType = new HashMap<>();
 
-        for (Map booking : allBookings) {
+        for (Map<String, Object> booking : allBookings) {
             String vt = (String) booking.get("vehicleType");
             if (vt != null) byVehicleType.merge(vt, 1L, Long::sum);
         }
@@ -262,7 +303,7 @@ public class AnalyticsServiceImpl implements AnalyticsService {
         return PlatformSummaryDTO.builder()
                 .totalActiveLots(totalLots)
                 .totalSpots(totalSpots)
-                .totalOccupiedSpots(totalOccupied)
+                .totalOccupiedSpots((int) totalOccupied)
                 .platformOccupancyRate(platformRate)
                 .totalBookingsToday(bookingsToday)
                 .totalBookingsAllTime(allBookings.size())
@@ -275,10 +316,10 @@ public class AnalyticsServiceImpl implements AnalyticsService {
 
     @Override
     public void logOccupancy(Long lotId, int occupiedSpots, int totalSpots) {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now  = LocalDateTime.now();
         double rate = totalSpots > 0 ? (double) occupiedSpots / totalSpots : 0.0;
 
-        OccupancyLog log = OccupancyLog.builder()
+        OccupancyLog entry = OccupancyLog.builder()
                 .lotId(lotId)
                 .timestamp(now)
                 .occupancyRate(Math.round(rate * 10000.0) / 10000.0)
@@ -288,49 +329,48 @@ public class AnalyticsServiceImpl implements AnalyticsService {
                 .dayOfWeek(now.getDayOfWeek().getValue())
                 .build();
 
-        logRepo.save(log);
+        logRepo.save(entry);
     }
 
-    @SuppressWarnings("unchecked")
-    private List<Map> fetchBookingsForLot(Long lotId, String bearerToken) {
+    // ── private helpers ──────────────────────────────────────────────────────────────────────────
+    
+    private List<Long> fetchActiveLotIds() {
         try {
-            String url = bookingServiceUrl + "/api/bookings/lot/" + lotId;
+            List<Long> lotIds = bookingServiceClient.getDistinctLotIds();
+            return lotIds != null ? lotIds : List.of();
+        } catch (Exception e) {
+            log.error("Could not fetch lot IDs: {}", e.getMessage());
+            return List.of();
+        }
+    }
 
-            HttpHeaders headers = new HttpHeaders();
-            headers.set("Authorization", bearerToken);
-            HttpEntity<Void> entity = new HttpEntity<>(headers);
-
-            ResponseEntity<Map[]> response = restTemplate.exchange(
-                    url, HttpMethod.GET, entity, Map[].class);
-
-            Map[] result = response.getBody();
-            return result != null ? Arrays.asList(result) : Collections.emptyList();
+    private List<Map<String, Object>> fetchBookingsForLot(Long lotId, String token) {
+        try {
+            List<Map<String, Object>> result = bookingServiceClient.getBookingsByLot(lotId, token);
+            return result != null ? result : Collections.emptyList();
         } catch (Exception e) {
             log.error("Could not fetch bookings for lot {}: {}", lotId, e.getMessage());
             return Collections.emptyList();
         }
     }
 
-    @SuppressWarnings("unchecked")
-    private List<Map> fetchAllBookings() {
+    private List<Map<String, Object>> fetchAllBookings(String token) {
         try {
-            String url = bookingServiceUrl + "/api/bookings/admin/all";
-            Map[] result = restTemplate.getForObject(url, Map[].class);
-            return result != null ? Arrays.asList(result) : Collections.emptyList();
+            List<Map<String, Object>> result = bookingServiceClient.getAllBookings(token);
+            return result != null ? result : Collections.emptyList();
         } catch (Exception e) {
             log.error("Could not fetch all bookings: {}", e.getMessage());
             return Collections.emptyList();
         }
     }
 
-    private double fetchTotalRevenue(LocalDate from, LocalDate to) {
+    private double fetchTotalRevenue(LocalDate from, LocalDate to, String token) {
         try {
-            String url = paymentServiceUrl + "/api/payments/admin/all";
-            Map[] payments = restTemplate.getForObject(url, Map[].class);
+            List<Map<String, Object>> payments = paymentServiceClient.getAllPayments(token);
             if (payments == null) return 0.0;
 
-            return Arrays.stream(payments)
-                    .filter(p -> "PAID".equals(p.get("status")))
+            return payments.stream()
+                    .filter(p -> "PAID".equals(p.get(STATUS)))
                     .filter(p -> {
                         String paidAt = (String) p.get("paidAt");
                         if (paidAt == null) return false;

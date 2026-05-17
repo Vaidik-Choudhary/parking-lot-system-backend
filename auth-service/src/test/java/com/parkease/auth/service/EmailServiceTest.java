@@ -42,7 +42,7 @@ class EmailServiceTest {
 
         assertEquals("noreply@parkease.com", message.getFrom());
         assertEquals("vaidik@test.com", message.getTo()[0]);
-        assertEquals("ParkEase — Reset Your Password", message.getSubject());
+        assertEquals("ParkEase â€” Reset Your Password", message.getSubject());
         assertTrue(message.getText().contains("token123"));
         assertTrue(message.getText().contains("http://localhost:5173/reset-password"));
     }

@@ -17,7 +17,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
@@ -226,6 +225,60 @@ class AuthServiceImplTest {
 
         assertThrows(InvalidTokenException.class,
                 () -> service.resetPassword(req));
+    }
+
+    @Test
+    void login_DisabledAccount_Throws() {
+        LoginRequest req = new LoginRequest();
+        req.setEmail("v@t.com");
+        req.setPassword("p");
+
+        doThrow(new org.springframework.security.authentication.DisabledException("disabled"))
+                .when(authenticationManager).authenticate(any());
+        
+        assertThrows(BadCredentialsException.class, () -> service.login(req));
+    }
+
+    @Test
+    void resetPassword_ExpiredToken_Throws() {
+        PasswordResetToken token = PasswordResetToken.builder()
+                .token("reset_123")
+                .expiresAt(LocalDateTime.now().minusHours(1))
+                .used(false)
+                .build();
+        
+        ResetPasswordRequest req = new ResetPasswordRequest();
+        req.setToken("reset_123");
+
+        when(passwordResetTokenRepository.findByToken("reset_123")).thenReturn(Optional.of(token));
+
+        assertThrows(InvalidTokenException.class, () -> service.resetPassword(req));
+    }
+
+    @Test
+    void changePassword_Success() {
+        ChangePasswordRequest req = new ChangePasswordRequest();
+        req.setOldPassword("old");
+        req.setNewPassword("new");
+
+        when(userRepository.findByEmail(user.getEmail())).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("old", user.getPassword())).thenReturn(true);
+        when(passwordEncoder.encode("new")).thenReturn("new_encoded");
+
+        service.changePassword(user.getEmail(), req);
+        verify(userRepository).save(user);
+    }
+
+    @Test
+    void changePassword_InvalidOldPassword_Throws() {
+        ChangePasswordRequest req = new ChangePasswordRequest();
+        req.setOldPassword("wrong");
+
+        when(userRepository.findByEmail(user.getEmail())).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("wrong", user.getPassword())).thenReturn(false);
+
+        String userEmail = user.getEmail();
+        assertThrows(BadCredentialsException.class, () -> service.changePassword(userEmail, req));
     }
 
     @Test

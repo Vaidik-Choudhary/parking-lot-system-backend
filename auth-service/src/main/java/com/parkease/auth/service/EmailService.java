@@ -25,7 +25,7 @@ public class EmailService {
             SimpleMailMessage message = new SimpleMailMessage();
             message.setFrom(fromEmail);
             message.setTo(toEmail);
-            message.setSubject("ParkEase — Reset Your Password");
+            message.setSubject("ParkEase â€” Reset Your Password");
 
             String resetLink = frontendUrl + "/reset-password?token=" + resetToken;
 
@@ -36,7 +36,7 @@ public class EmailService {
                 resetLink + "\n\n" +
                 "This link expires in 15 minutes.\n\n" +
                 "If you did not request this, please ignore this email.\n\n" +
-                "— The ParkEase Team"
+                "â€” The ParkEase Team"
             );
 
             mailSender.send(message);
@@ -58,7 +58,7 @@ public class EmailService {
                 "Hi " + fullName + ",\n\n" +
                 "Welcome to ParkEase! Your account has been created successfully.\n\n" +
                 "You can now find and reserve parking spots near you.\n\n" +
-                "— The ParkEase Team"
+                "â€” The ParkEase Team"
             );
 
             mailSender.send(message);

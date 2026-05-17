@@ -26,6 +26,8 @@ public class BookingResponseDTO {
 
     private double pricePerHour;
     private double totalAmount;     
+    @com.fasterxml.jackson.annotation.JsonProperty("isPaid")
+    private boolean paid;
     private double estimatedAmount;  
 
     private LocalDateTime createdAt;

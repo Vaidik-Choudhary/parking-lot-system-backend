@@ -27,7 +27,21 @@ public class SecurityConfig {
             .csrf(AbstractHttpConfigurer::disable)
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
+                .requestMatchers(
+                    "/swagger-ui/**",
+                    "/swagger-ui.html",
+                    "/v3/api-docs/**",
+                    "/v3/api-docs.yaml",
+                    "/actuator/**"
+                ).permitAll()
                 .requestMatchers("GET", "/api/spots/lot/**").permitAll()
+                .requestMatchers("GET", "/api/spots/{spotId}").permitAll()
+                .requestMatchers(
+                    "/api/spots/{spotId}/occupy",
+                    "/api/spots/{spotId}/release",
+                    "/api/spots/{spotId}/reserve",
+                    "/api/spots/{spotId}/cancel"
+                ).permitAll()
                 .anyRequest().authenticated()
             )
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);

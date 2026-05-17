@@ -28,11 +28,22 @@ public class SecurityConfig {
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(
+                    "/swagger-ui/**",
+                    "/swagger-ui.html",
+                    "/v3/api-docs/**",
+                    "/v3/api-docs.yaml",
+                    "/actuator/**"
+                ).permitAll()
+                .requestMatchers(
                     "GET", "/api/lots",
                     "/api/lots/{id}",
                     "/api/lots/city/**",
                     "/api/lots/nearby",
                     "/api/lots/search"
+                ).permitAll()
+                .requestMatchers(
+                    "/api/lots/{id}/decrement",
+                    "/api/lots/{id}/increment"
                 ).permitAll()
                 .anyRequest().authenticated()
             )

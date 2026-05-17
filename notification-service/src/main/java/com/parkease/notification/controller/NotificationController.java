@@ -27,7 +27,7 @@ public class NotificationController {
     @PostMapping("/send")
     public ResponseEntity<NotificationResponseDTO> send(
             @Valid @RequestBody SendNotificationRequest request) {
-        log.info("POST /api/notifications/send → [{}] to {}",
+        log.info("POST /api/notifications/send â†’ [{}] to {}",
                 request.getType(), request.getRecipientEmail());
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(service.send(request));
@@ -54,7 +54,7 @@ public class NotificationController {
 
     /**
      * GET /api/notifications/my/count
-     * Returns the unread count — used for the notification bell badge.
+     * Returns the unread count â€” used for the notification bell badge.
      * Response: { "unreadCount": 3 }
      */
     @GetMapping("/my/count")

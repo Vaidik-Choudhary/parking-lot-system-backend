@@ -53,39 +53,42 @@ public class SecurityConfig {
             .csrf(AbstractHttpConfigurer::disable)
 
             .sessionManagement(session ->
-                session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
 
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers(
-                    "/api/auth/register",
-                    "/api/auth/login",
-                    "/api/auth/refresh",
-                    "/api/auth/forgot-password",
-                    "/api/auth/reset-password",
-                    "/oauth2/**",
-                    "/login/oauth2/**"
-                ).permitAll()
+                    .requestMatchers(
+                        "/api/auth/register",
+                        "/api/auth/login",
+                        "/api/auth/refresh",
+                        "/api/auth/forgot-password",
+                        "/api/auth/reset-password",
+                        "/oauth2/**",
+                        "/login/oauth2/**",
+                        "/swagger-ui/**",
+                        "/swagger-ui.html",
+                        "/v3/api-docs/**",
+                        "/v3/api-docs.yaml",
+                        "/actuator/**"
+                    ).permitAll()
 
-                .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                    .requestMatchers("/api/admin/**").hasRole("ADMIN")
 
-                .requestMatchers("/api/manager/**").hasRole("LOT_MANAGER")
+                    .requestMatchers("/api/manager/**").hasRole("LOT_MANAGER")
 
-                .anyRequest().authenticated()
-            )
+                    .anyRequest().authenticated()
+                )
 
-            .oauth2Login(oauth2 -> oauth2
-                .authorizationEndpoint(endpoint ->
-                    endpoint.baseUri("/oauth2/authorize"))         
-                .redirectionEndpoint(endpoint ->
-                    endpoint.baseUri("/oauth2/callback/*"))      
-                .successHandler(oAuth2SuccessHandler)             
-            )
+                .oauth2Login(oauth2 -> oauth2
+                	    .authorizationEndpoint(endpoint ->
+                	        endpoint.baseUri("/oauth2/authorize"))
+                	    .successHandler(oAuth2SuccessHandler)
+                	)
 
-            .authenticationProvider(authenticationProvider())
+                .authenticationProvider(authenticationProvider())
 
-  
-            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+      
+                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
-        return http.build();
-    }
+            return http.build();
+        }
 }

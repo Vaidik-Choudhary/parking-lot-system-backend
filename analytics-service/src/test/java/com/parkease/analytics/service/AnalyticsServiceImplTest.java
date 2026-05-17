@@ -1,5 +1,7 @@
 package com.parkease.analytics.service;
 
+import com.parkease.analytics.client.BookingServiceClient;
+import com.parkease.analytics.client.PaymentServiceClient;
 import com.parkease.analytics.dto.response.*;
 import com.parkease.analytics.entity.OccupancyLog;
 import com.parkease.analytics.repository.OccupancyLogRepository;
@@ -9,9 +11,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.http.ResponseEntity;
-import org.springframework.test.util.ReflectionTestUtils;
-import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -29,19 +28,24 @@ class AnalyticsServiceImplTest {
     private OccupancyLogRepository logRepo;
 
     @Mock
-    private RestTemplate restTemplate;
+    private BookingServiceClient bookingServiceClient;
+
+    @Mock
+    private PaymentServiceClient paymentServiceClient;
+
+    @Mock
+    private com.parkease.analytics.client.SpotServiceClient spotServiceClient;
 
     @InjectMocks
     private AnalyticsServiceImpl service;
 
     @BeforeEach
     void setUp() {
-        ReflectionTestUtils.setField(service, "bookingServiceUrl", "http://booking-service");
-        ReflectionTestUtils.setField(service, "paymentServiceUrl", "http://payment-service");
     }
 
     @Test
     void shouldReturnZeroOccupancyWhenNoLogsFound() {
+        lenient().when(spotServiceClient.getSpotsByLot(1L)).thenReturn(null);
         when(logRepo.findTopByLotIdOrderByTimestampDesc(1L)).thenReturn(null);
 
         OccupancyRateDTO result = service.getOccupancyRate(1L);
@@ -53,6 +57,7 @@ class AnalyticsServiceImplTest {
 
     @Test
     void shouldReturnOccupancyRateSuccessfully() {
+        lenient().when(spotServiceClient.getSpotsByLot(1L)).thenReturn(null);
         OccupancyLog log = OccupancyLog.builder()
                 .lotId(1L)
                 .occupiedSpots(8)
@@ -103,7 +108,7 @@ class AnalyticsServiceImplTest {
 
     @Test
     void shouldReturnRevenueReportSuccessfully() {
-        Map[] bookings = new Map[]{
+        List<Map<String, Object>> bookings = List.of(
                 Map.of(
                         "status", "COMPLETED",
                         "createdAt", "2026-04-14T10:00:00",
@@ -114,14 +119,9 @@ class AnalyticsServiceImplTest {
                         "createdAt", "2026-04-14T12:00:00",
                         "totalAmount", 50.0
                 )
-        };
+        );
 
-        when(restTemplate.exchange(
-                contains("/api/bookings/lot/1"),
-                any(),
-                any(),
-                eq(Map[].class)
-        )).thenReturn(ResponseEntity.ok(bookings));
+        when(bookingServiceClient.getBookingsByLot(eq(1L), anyString())).thenReturn(bookings);
 
         RevenueReportDTO result = service.getRevenueReport(
                 1L,
@@ -136,20 +136,15 @@ class AnalyticsServiceImplTest {
 
     @Test
     void shouldReturnAverageParkingDurationSuccessfully() {
-        Map[] bookings = new Map[]{
+        List<Map<String, Object>> bookings = List.of(
                 Map.of(
                         "status", "COMPLETED",
                         "checkInTime", "2026-04-14T10:00:00",
                         "checkOutTime", "2026-04-14T12:00:00"
                 )
-        };
+        );
 
-        when(restTemplate.exchange(
-                contains("/api/bookings/lot/1"),
-                any(),
-                any(),
-                eq(Map[].class)
-        )).thenReturn(ResponseEntity.ok(bookings));
+        when(bookingServiceClient.getBookingsByLot(eq(1L), anyString())).thenReturn(bookings);
 
         double result = service.getAvgParkingDuration(1L, "Bearer token");
 
@@ -170,26 +165,24 @@ class AnalyticsServiceImplTest {
                 new Object[]{2L, LocalDateTime.now(), 5, 10}
         );
 
-        Map[] allBookings = new Map[]{
+        List<Map<String, Object>> allBookings = List.of(
                 Map.of(
                         "createdAt", LocalDate.now() + "T10:00:00",
                         "vehicleType", "CAR"
                 )
-        };
+        );
 
-        Map[] payments = new Map[]{
+        List<Map<String, Object>> payments = List.of(
                 Map.of(
                         "status", "PAID",
                         "paidAt", LocalDate.now() + "T12:00:00",
                         "amount", 200.0
                 )
-        };
+        );
 
         when(logRepo.getLatestOccupancyAllLots()).thenReturn(latestLogs);
-        when(restTemplate.getForObject(contains("/api/bookings/admin/all"), eq(Map[].class)))
-                .thenReturn(allBookings);
-        when(restTemplate.getForObject(contains("/api/payments/admin/all"), eq(Map[].class)))
-                .thenReturn(payments);
+        when(bookingServiceClient.getAllBookings(anyString())).thenReturn(allBookings);
+        when(paymentServiceClient.getAllPayments(anyString())).thenReturn(payments);
 
         PlatformSummaryDTO result = service.getPlatformSummary("Bearer token");
 
@@ -197,5 +190,177 @@ class AnalyticsServiceImplTest {
         assertEquals(20, result.getTotalSpots());
         assertEquals(13, result.getTotalOccupiedSpots());
         assertEquals(200.0, result.getTotalRevenueToday());
+    }
+
+    @Test
+    void getSpotTypeUtilisation_Success() {
+        List<Map<String, Object>> bookings = List.of(
+                Map.of("status", "COMPLETED", "vehicleType", "FOUR_WHEELER"),
+                Map.of("status", "COMPLETED", "vehicleType", "FOUR_WHEELER"),
+                Map.of("status", "COMPLETED", "vehicleType", "TWO_WHEELER")
+        );
+        when(bookingServiceClient.getBookingsByLot(eq(1L), anyString())).thenReturn(bookings);
+
+        Map<String, Double> result = service.getSpotTypeUtilisation(1L, "token");
+        assertEquals(2, result.size());
+        assertEquals(66.67, result.get("FOUR_WHEELER"));
+        assertEquals(33.33, result.get("TWO_WHEELER"));
+    }
+
+    @Test
+    void getPlatformSummary_Fallback_WhenLogsEmpty() {
+        when(logRepo.getLatestOccupancyAllLots()).thenReturn(List.of());
+        when(bookingServiceClient.getDistinctLotIds()).thenReturn(List.of(1L));
+        
+        lenient().when(spotServiceClient.getSpotsByLot(1L)).thenReturn(null);
+        OccupancyLog latestLog = OccupancyLog.builder().occupiedSpots(5).totalSpots(10).build();
+        when(logRepo.findTopByLotIdOrderByTimestampDesc(1L)).thenReturn(latestLog);
+        
+        when(bookingServiceClient.getAllBookings(anyString())).thenReturn(List.of());
+        when(paymentServiceClient.getAllPayments(anyString())).thenReturn(List.of());
+
+        PlatformSummaryDTO result = service.getPlatformSummary("token");
+        
+        assertEquals(1, result.getTotalActiveLots());
+        assertEquals(10, result.getTotalSpots());
+        assertEquals(5, result.getTotalOccupiedSpots());
+    }
+
+    @Test
+    void getAvgParkingDuration_WithParseError() {
+        List<Map<String, Object>> bookings = List.of(
+                Map.of(
+                        "status", "COMPLETED",
+                        "checkInTime", "invalid-date",
+                        "checkOutTime", "invalid-date"
+                )
+        );
+        when(bookingServiceClient.getBookingsByLot(eq(1L), anyString())).thenReturn(bookings);
+
+        double result = service.getAvgParkingDuration(1L, "token");
+        assertEquals(0.0, result);
+    }
+
+    @Test
+    void fetchTotalRevenue_WithException() {
+        when(logRepo.getLatestOccupancyAllLots()).thenReturn(List.of());
+        when(bookingServiceClient.getDistinctLotIds()).thenReturn(List.of());
+        when(bookingServiceClient.getAllBookings(anyString())).thenReturn(List.of());
+        when(paymentServiceClient.getAllPayments(anyString())).thenThrow(new RuntimeException("API error"));
+        
+        PlatformSummaryDTO result = service.getPlatformSummary("token");
+        assertEquals(0.0, result.getTotalRevenueToday());
+    }
+
+    @Test
+    void getPlatformSummary_WithDifferentVehicleTypes() {
+        Object[] logData = new Object[]{1L, LocalDateTime.now(), 8, 10};
+        List<Object[]> latestLogs = java.util.Collections.singletonList(logData);
+        List<Map<String, Object>> allBookings = List.of(
+                Map.of("vehicleType", "CAR"),
+                Map.of("vehicleType", "BIKE"),
+                Map.of("vehicleType", "CAR")
+        );
+        when(logRepo.getLatestOccupancyAllLots()).thenReturn(latestLogs);
+        when(bookingServiceClient.getAllBookings(anyString())).thenReturn(allBookings);
+        when(paymentServiceClient.getAllPayments(anyString())).thenReturn(List.of());
+
+        PlatformSummaryDTO result = service.getPlatformSummary("token");
+        assertEquals(2L, result.getBookingsByVehicleType().get("CAR"));
+        assertEquals(1L, result.getBookingsByVehicleType().get("BIKE"));
+    }
+
+    @Test
+    void getLotSummary_Success() {
+        lenient().when(spotServiceClient.getSpotsByLot(1L)).thenReturn(null);
+        OccupancyLog log = OccupancyLog.builder().lotId(1L).occupiedSpots(8).totalSpots(10).occupancyRate(0.8).build();
+        when(logRepo.findTopByLotIdOrderByTimestampDesc(1L)).thenReturn(log);
+        when(logRepo.getPeakHours(1L)).thenReturn(java.util.Collections.singletonList(new Object[]{10, 0.95}));
+        
+        List<Map<String, Object>> bookings = List.of(
+                Map.of("status", "COMPLETED", "checkInTime", LocalDate.now() + "T10:00:00", "checkOutTime", LocalDate.now() + "T12:00:00", "vehicleType", "FOUR_WHEELER", "createdAt", LocalDate.now() + "T10:00:00", "totalAmount", 100.0)
+        );
+        when(bookingServiceClient.getBookingsByLot(eq(1L), anyString())).thenReturn(bookings);
+        
+        LotSummaryDTO summary = service.getLotSummary(1L, "token");
+        assertNotNull(summary);
+        assertEquals(0.8, summary.getCurrentOccupancyRate());
+    }
+
+    @Test
+    void getOccupancyRate_WithRealtimeData() {
+        List<Map<String, Object>> spots = List.of(
+            Map.of("status", "OCCUPIED"),
+            Map.of("status", "AVAILABLE"),
+            Map.of("status", "RESERVED")
+        );
+        when(spotServiceClient.getSpotsByLot(1L)).thenReturn(spots);
+
+        OccupancyRateDTO result = service.getOccupancyRate(1L);
+
+        assertEquals(2, result.getOccupiedSpots());
+        assertEquals(3, result.getTotalSpots());
+        assertEquals(1, result.getAvailableSpots());
+    }
+
+    @Test
+    void getOccupancyRate_ExceptionInSpotClient() {
+        when(spotServiceClient.getSpotsByLot(1L)).thenThrow(new RuntimeException("API error"));
+        when(logRepo.findTopByLotIdOrderByTimestampDesc(1L)).thenReturn(null);
+
+        OccupancyRateDTO result = service.getOccupancyRate(1L);
+
+        assertEquals(0.0, result.getOccupancyRate());
+    }
+
+    @Test
+    void getPlatformSummary_Fallback_WithActiveLotsAndRealtimeOccupancy() {
+        when(logRepo.getLatestOccupancyAllLots()).thenReturn(List.of());
+        when(bookingServiceClient.getDistinctLotIds()).thenReturn(List.of(1L, 2L));
+        
+        List<Map<String, Object>> spots = List.of(Map.of("status", "OCCUPIED"));
+        when(spotServiceClient.getSpotsByLot(anyLong())).thenReturn(spots);
+        
+        when(bookingServiceClient.getAllBookings(anyString())).thenReturn(List.of());
+        when(paymentServiceClient.getAllPayments(anyString())).thenReturn(List.of());
+
+        PlatformSummaryDTO result = service.getPlatformSummary("token");
+        
+        assertEquals(2, result.getTotalActiveLots());
+        assertEquals(2, result.getTotalSpots());
+        assertEquals(2, result.getTotalOccupiedSpots());
+    }
+
+    @Test
+    void getAvgParkingDuration_WithNullTimes() {
+        List<Map<String, Object>> bookings = List.of(
+                Map.of("status", "COMPLETED") // Missing checkIn/checkOut
+        );
+        when(bookingServiceClient.getBookingsByLot(eq(1L), anyString())).thenReturn(bookings);
+
+        double result = service.getAvgParkingDuration(1L, "token");
+        assertEquals(0.0, result);
+    }
+
+    @Test
+    void getRevenueReport_WithNullCreatedAt() {
+        List<Map<String, Object>> bookings = List.of(
+                Map.of("status", "COMPLETED") // Missing createdAt
+        );
+        when(bookingServiceClient.getBookingsByLot(eq(1L), anyString())).thenReturn(bookings);
+
+        RevenueReportDTO result = service.getRevenueReport(1L, LocalDate.now(), LocalDate.now(), "token");
+        assertEquals(0.0, result.getTotalRevenue());
+    }
+
+    @Test
+    void fetchHelpers_Exceptions() {
+        when(bookingServiceClient.getDistinctLotIds()).thenThrow(new RuntimeException("Error"));
+        when(bookingServiceClient.getBookingsByLot(eq(1L), anyString())).thenThrow(new RuntimeException("Error"));
+        when(bookingServiceClient.getAllBookings(anyString())).thenThrow(new RuntimeException("Error"));
+        
+        // This will trigger all the catch blocks in the private helpers
+        assertEquals(0.0, service.getAvgParkingDuration(1L, "token"));
+        assertEquals(0, service.getPlatformSummary("token").getTotalActiveLots());
     }
 }

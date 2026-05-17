@@ -4,7 +4,7 @@ import com.itextpdf.text.*;
 import com.itextpdf.text.pdf.*;
 import com.itextpdf.text.pdf.draw.LineSeparator;
 import com.parkease.payment.entity.Payment;
-import lombok.extern.slf4j.Slf4j;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -16,8 +16,8 @@ import java.nio.file.Paths;
 import java.time.format.DateTimeFormatter;
 
 @Service
-@Slf4j
 public class ReceiptService {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ReceiptService.class);
 
     @Value("${app.receipt.storage-path}")
     private String storagePath;
@@ -91,7 +91,11 @@ public class ReceiptService {
             table.setWidths(new float[]{40f, 60f});
 
             addTableRow(table, "Receipt No.",   "RCP-" + payment.getPaymentId(),   labelFont, valueFont);
-            addTableRow(table, "Booking ID",    "#" + payment.getBookingId(),       labelFont, valueFont);
+            if (payment.getBookingId() != null) {
+                addTableRow(table, "Booking ID",    "#" + payment.getBookingId(),       labelFont, valueFont);
+            } else if (payment.getSubscriptionId() != null) {
+                addTableRow(table, "Subscription ID", "#" + payment.getSubscriptionId(), labelFont, valueFont);
+            }
             addTableRow(table, "Driver",        payment.getDriverEmail(),            labelFont, valueFont);
             addTableRow(table, "Amount Paid",   "₹ " + String.format("%.2f", payment.getAmount()), labelFont, valueFont);
             addTableRow(table, "Currency",      payment.getCurrency(),               labelFont, valueFont);

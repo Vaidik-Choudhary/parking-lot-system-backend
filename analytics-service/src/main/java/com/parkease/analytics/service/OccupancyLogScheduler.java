@@ -1,14 +1,12 @@
 package com.parkease.analytics.service;
 
-import com.parkease.analytics.service.AnalyticsService;
+import com.parkease.analytics.client.BookingServiceClient;
+import com.parkease.analytics.client.SpotServiceClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.RestTemplate;
 
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -17,21 +15,15 @@ import java.util.Map;
 @Slf4j
 public class OccupancyLogScheduler {
 
-    private final AnalyticsService analyticsService;
-    private final RestTemplate restTemplate;
+    private final AnalyticsService   analyticsService;
+    private final SpotServiceClient  spotServiceClient;
+    private final BookingServiceClient bookingServiceClient;
 
-    @Value("${app.services.spot-service}")
-    private String spotServiceUrl;
-
-    @Value("${app.services.booking-service}")
-    private String bookingServiceUrl;
-
-    @Scheduled(fixedDelay = 1_800_000)  
+    @Scheduled(fixedDelay = 300000) // Log every 5 minutes
     public void logAllLotOccupancies() {
         log.debug("Scheduler: logging occupancy snapshots for all lots");
 
         try {
-           
             List<Long> lotIds = fetchActiveLotIds();
 
             if (lotIds.isEmpty()) {
@@ -42,21 +34,13 @@ public class OccupancyLogScheduler {
             int logged = 0;
             for (Long lotId : lotIds) {
                 try {
-           
-                    Integer available = restTemplate.getForObject(
-                            spotServiceUrl + "/api/spots/lot/" + lotId + "/count",
-                            Integer.class
-                    );
+                    List<Map<String, Object>> spots = spotServiceClient.getSpotsByLot(lotId);
+                    if (spots == null) continue;
 
-                    Map[] spots = restTemplate.getForObject(
-                            spotServiceUrl + "/api/spots/lot/" + lotId,
-                            Map[].class
-                    );
-
-                    if (spots == null || available == null) continue;
-
-                    int total    = spots.length;
-                    int occupied = total - available;
+                    int total = spots.size();
+                    int occupied = (int) spots.stream()
+                            .filter(s -> "OCCUPIED".equals(s.get("status")) || "RESERVED".equals(s.get("status")))
+                            .count();
 
                     analyticsService.logOccupancy(lotId, occupied, total);
                     logged++;
@@ -73,21 +57,10 @@ public class OccupancyLogScheduler {
         }
     }
 
-    @SuppressWarnings("unchecked")
     private List<Long> fetchActiveLotIds() {
         try {
-            Map[] bookings = restTemplate.getForObject(
-                    bookingServiceUrl + "/api/bookings/admin/all", Map[].class);
-
-            if (bookings == null) return List.of();
-
-            return Arrays.stream(bookings)
-                    .map(b -> b.get("lotId"))
-                    .filter(id -> id != null)
-                    .map(id -> ((Number) id).longValue())
-                    .distinct()
-                    .toList();
-
+            List<Long> lotIds = bookingServiceClient.getDistinctLotIds();
+            return lotIds != null ? lotIds : List.of();
         } catch (Exception e) {
             log.error("Could not fetch lot IDs: {}", e.getMessage());
             return List.of();

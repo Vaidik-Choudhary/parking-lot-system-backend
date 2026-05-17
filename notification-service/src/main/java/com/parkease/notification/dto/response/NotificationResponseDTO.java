@@ -2,6 +2,7 @@ package com.parkease.notification.dto.response;
 
 import com.parkease.notification.entity.NotificationChannel;
 import com.parkease.notification.entity.NotificationType;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.*;
 import java.time.LocalDateTime;
 
@@ -19,6 +20,8 @@ public class NotificationResponseDTO {
     private String message;
     private Long relatedId;
     private String relatedType;
+
+    @JsonProperty("isRead")
     private boolean isRead;
     private LocalDateTime sentAt;
     private LocalDateTime readAt;

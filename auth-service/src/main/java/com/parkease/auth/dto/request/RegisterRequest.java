@@ -6,7 +6,11 @@ import lombok.Data;
 
 @Data
 public class RegisterRequest {
-
+	
+	@Pattern(
+		    regexp = "^[A-Za-z\\s]{2,50}$",
+		    message = "Full name must contain only letters and spaces"
+		)
     @NotBlank(message = "Full name is required")
     private String fullName;
 
@@ -14,6 +18,10 @@ public class RegisterRequest {
     @Email(message = "Please provide a valid email address")
     private String email;
 
+//    @Pattern(
+//            regexp = "^(?=.*[A-Z])(?=.*[a-z])(?=.*\\d).{8,}$",
+//            message = "Password must be at least 8 characters and include uppercase, lowercase, and a number"
+//        )
     @NotBlank(message = "Password is required")
     @Size(min = 6, message = "Password must be at least 6 characters")
     private String password;

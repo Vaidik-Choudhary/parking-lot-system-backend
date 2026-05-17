@@ -38,7 +38,7 @@ public class EmailService {
             MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, "UTF-8");
             helper.setFrom(fromEmail);
             helper.setTo(toEmail);
-            helper.setSubject("ParkEase — " + subject);
+            helper.setSubject("ParkEase â€” " + subject);
             helper.setText(htmlContent, true); 
 
             mailSender.send(mimeMessage);

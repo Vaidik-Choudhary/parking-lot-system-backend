@@ -10,13 +10,13 @@ import com.parkease.parkingspot.entity.VehicleType;
 
 public interface SpotService {
 
-    // ── Manager operations ────────────────────────────────────────────────────
+    // â”€â”€ Manager operations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     SpotResponseDTO addSpot(SpotRequestDTO dto);
     List<SpotResponseDTO> addBulkSpots(BulkSpotRequestDTO dto);
     SpotResponseDTO updateSpot(Long spotId, SpotRequestDTO dto);
     void deleteSpot(Long spotId);
 
-    // ── Query operations ──────────────────────────────────────────────────────
+    // â”€â”€ Query operations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     SpotResponseDTO getSpotById(Long spotId);
     List<SpotResponseDTO> getSpotsByLot(Long lotId);
     List<SpotResponseDTO> getAvailableSpots(Long lotId);
@@ -27,7 +27,7 @@ public interface SpotService {
     List<SpotResponseDTO> getHandicappedSpots(Long lotId);
     int countAvailableSpots(Long lotId);
 
-    // ── Status transitions (called by booking-service) ────────────────────────
+    // â”€â”€ Status transitions (called by booking-service) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     SpotResponseDTO reserveSpot(Long spotId);    
     SpotResponseDTO occupySpot(Long spotId);  
     SpotResponseDTO releaseSpot(Long spotId);   

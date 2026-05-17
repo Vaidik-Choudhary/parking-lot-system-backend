@@ -74,6 +74,8 @@ public class SpotServiceImpl implements SpotService {
                     .isEVCharging(dto.isEVCharging())
                     .isHandicapped(dto.isHandicapped())
                     .pricePerHour(dto.getPricePerHour())
+                    .monthlySubscriptionEnabled(dto.isMonthlySubscriptionEnabled())
+                    .monthlyRate(dto.getMonthlyRate())
                     .build();
  
             spots.add(spot);
@@ -96,7 +98,9 @@ public class SpotServiceImpl implements SpotService {
         spot.setEVCharging(dto.isEVCharging());
         spot.setHandicapped(dto.isHandicapped());
         spot.setPricePerHour(dto.getPricePerHour());
- 
+        spot.setMonthlySubscriptionEnabled(dto.isMonthlySubscriptionEnabled());
+        spot.setMonthlyRate(dto.getMonthlyRate());
+
         return mapper.toDTO(repo.save(spot));
     }
     @Override
@@ -107,7 +111,7 @@ public class SpotServiceImpl implements SpotService {
  
         if (spot.getStatus() == SpotStatus.OCCUPIED || spot.getStatus() == SpotStatus.RESERVED) {
             throw new SpotNotAvailableException(
-                "Cannot delete spot " + spotId + " — it is currently " + spot.getStatus());
+                "Cannot delete spot " + spotId + " â€” it is currently " + spot.getStatus());
         }
  
         repo.delete(spot);
@@ -184,9 +188,8 @@ public class SpotServiceImpl implements SpotService {
         log.info("Occupying spot id: {}", spotId);
         ParkingSpot spot = getSpotOrThrow(spotId);
  
-        if (spot.getStatus() != SpotStatus.RESERVED) {
-            throw new SpotNotAvailableException(
-                "Spot " + spotId + " must be RESERVED before check-in. Current: " + spot.getStatus());
+        if (spot.getStatus() == SpotStatus.OCCUPIED) {
+            throw new SpotNotAvailableException("Spot already occupied");
         }
  
         spot.setStatus(SpotStatus.OCCUPIED);

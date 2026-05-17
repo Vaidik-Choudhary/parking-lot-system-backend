@@ -21,6 +21,8 @@ public class SpotMapper {
                 .isEVCharging(dto.isEVCharging())
                 .isHandicapped(dto.isHandicapped())
                 .pricePerHour(dto.getPricePerHour())
+                .monthlySubscriptionEnabled(dto.isMonthlySubscriptionEnabled())
+                .monthlyRate(dto.getMonthlyRate())
                 .build();
     }
 
@@ -36,6 +38,8 @@ public class SpotMapper {
                 .isEVCharging(spot.isEVCharging())
                 .isHandicapped(spot.isHandicapped())
                 .pricePerHour(spot.getPricePerHour())
+                .monthlySubscriptionEnabled(spot.isMonthlySubscriptionEnabled())
+                .monthlyRate(spot.getMonthlyRate())
                 .createdAt(spot.getCreatedAt())
                 .build();
     }

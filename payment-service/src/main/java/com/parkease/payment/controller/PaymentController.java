@@ -9,7 +9,6 @@ import com.parkease.payment.dto.response.PaymentResponseDTO;
 import com.parkease.payment.service.PaymentService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.*;
@@ -19,15 +18,17 @@ import org.springframework.web.bind.annotation.*;
 
 import java.io.File;
 import java.util.List;
+import com.parkease.payment.annotation.TrackExecutionTime;
 
 @RestController
 @RequestMapping("/api/payments")
 @RequiredArgsConstructor
-@Slf4j
 public class PaymentController {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(PaymentController.class);
 
     private final PaymentService service;
 
+    @TrackExecutionTime
     @PostMapping("/order")
     public ResponseEntity<OrderResponseDTO> createOrder(
             @Valid @RequestBody CreateOrderRequest request,
@@ -38,6 +39,33 @@ public class PaymentController {
                 .body(service.createOrder(request, email));
     }
 
+    @TrackExecutionTime
+    @PostMapping("/initialize")
+    public ResponseEntity<ApiResponse> initializePayment(
+            @Valid @RequestBody CreateOrderRequest request,
+            Authentication auth) {
+        String email = (String) auth.getPrincipal();
+        log.info("POST /api/payments/initialize - driver: {} booking: {}", email, request.getBookingId());
+        service.initializePayment(request, email);
+        return ResponseEntity.ok(ApiResponse.ok("Payment record initialized."));
+    }
+
+    @PostMapping("/subscription/initialize")
+    public ResponseEntity<ApiResponse> initializeSubscriptionPayment(
+            @RequestBody com.parkease.payment.dto.request.SubscriptionPaymentRequest request) {
+        log.info("POST /api/payments/subscription/initialize - driver: {} subscription: {}", 
+                request.getDriverEmail(), request.getSubscriptionId());
+        
+        // Normalize email to ensure consistency
+        if (request.getDriverEmail() != null) {
+            request.setDriverEmail(request.getDriverEmail().trim().toLowerCase());
+        }
+        
+        service.initializeSubscriptionPayment(request);
+        return ResponseEntity.ok(ApiResponse.ok("Subscription payment initialized."));
+    }
+
+    @TrackExecutionTime
     @PostMapping("/verify")
     public ResponseEntity<PaymentResponseDTO> verifyPayment(
             @Valid @RequestBody VerifyPaymentRequest request) {
@@ -56,8 +84,17 @@ public class PaymentController {
     @GetMapping("/my")
     public ResponseEntity<List<PaymentResponseDTO>> getMyPayments(Authentication auth) {
         String email = (String) auth.getPrincipal();
-        log.info("GET /api/payments/my - driver: {}", email);
-        return ResponseEntity.ok(service.getMyPayments(email));
+        log.info("GET /api/payments/my for email: {}", email);
+        List<PaymentResponseDTO> payments = service.getMyPayments(email);
+        log.info("Found {} total records for email: {}", payments.size(), email);
+        return ResponseEntity.ok(payments);
+    }
+
+    @GetMapping("/pending/count")
+    public ResponseEntity<Long> getPendingCount(Authentication auth) {
+        String email = (String) auth.getPrincipal();
+        log.info("GET /api/payments/pending/count - driver: {}", email);
+        return ResponseEntity.ok(service.getPendingPaymentsCount(email));
     }
 
     @GetMapping("/booking/{bookingId}")

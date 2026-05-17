@@ -1,7 +1,7 @@
 package com.parkease.payment.dto.request;
 
-import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
+import jakarta.validation.constraints.NotBlank;
 
 @Data
 public class VerifyPaymentRequest {
