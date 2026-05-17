@@ -50,7 +50,7 @@ out/
 *.bin
 *.out
 *.dump
-*.xml
+# *.xml
 *.json
 *.csv
 *.ser
