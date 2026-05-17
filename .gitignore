@@ -79,7 +79,7 @@ coverage/
 # Secrets / configs
 
 *.env
-*.properties
+# *.properties
 *.keystore
 *.jks
 *.pem
